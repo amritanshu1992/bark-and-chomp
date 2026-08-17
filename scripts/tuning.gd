@@ -11,6 +11,10 @@ extends Resource
 @export var bark_full_charge_ms := 400
 @export var bark_cooldown_s := 0.85     # 0.7-1.0
 @export var bark_range_units := 2.5     # 2-3 dog lengths
+@export var bark_hitbox_duration_s := 0.15  # "a few frames" per TDD Sec4.2
+
+# Projectile (Milestone 1.3 test-only spawner; real timing owned by rival_base.gd from 1.4)
+@export var projectile_speed := 8.0     # u/s, toward player
 
 # Zoomies
 @export var zoomie_duration_s := 4.0

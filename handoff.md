@@ -1,6 +1,6 @@
 # Handoff — "Bark & Chomp"
 
-Last updated: 2026-08-18 (session 3)
+Last updated: 2026-08-18 (session 3, continued)
 
 Purpose: read this first at the start of a new session to pick up exactly where things left off. It is a living doc — update it at the end of each session.
 
@@ -78,22 +78,31 @@ Still open, but not blocking progression to 1.2:
 - No bark hitbox / projectile deflect logic yet — that's explicitly Milestone 1.3 scope (TDD §6), not touched here. This milestone is pure input-feedback plumbing.
 - **User confirmed on real device**: quick taps hop cleanly with zero accidental whimpers, and CHARGING/BLAST/WHIMPER all displayed distinctly and correctly. This satisfies the project plan's exact 1.2 test question ("zero accidental whimpers when the player intended a hop").
 
+**Milestone 1.3 — Projectile + deflect: done, confirmed on-device.**
+- `scripts/projectile.gd` + `scenes/projectile.tscn`: pooled `Area2D` projectile (black `ColorRect` square), constant horizontal velocity toward the player, 5s max-lifetime auto-despawn (decoupled from world coordinates — simpler and more robust than an x-position bounds check for a prototype-phase test rig).
+- `scripts/projectile_spawner.gd`: **test-only** timer spawner (every 2.5s, pool of 4, spawns 700px ahead of the player) since there's no rival yet — explicitly commented as a stand-in to be replaced by `rival_base.gd`'s THROWING state in Milestone 1.4. Don't build this out further.
+- `player.gd`/`player.tscn`: added a `BarkHitbox` `Area2D` child, sized from `tuning.bark_range_units` at runtime (keeps tuning-as-data intact), positioned forward of the player. Activated only during the brief window after a full BLAST release (`tuning.bark_hitbox_duration_s = 0.15`, "a few frames" per TDD §4.2).
+- Collision layers introduced (previously everything was default layer/mask 1): `world=1` (Ground/Obstacle, untouched), `player=2`, `projectile=4`, `bark_hitbox=8`. Player's `collision_mask` was left untouched (still `1`) so its physical collision with Ground/Obstacle via `move_and_slide()` was never at risk — only `collision_layer` was added.
+- **Real bug hit and fixed**: first deploy had projectiles auto-deflecting on every pass regardless of whether the player had barked at all ("two squares... automatically reversing and not hitting"). Root cause: toggled `bark_hitbox.monitoring` on/off to gate the hitbox window, but **`monitoring` controls whether an Area2D scans others — whether an Area2D *can be detected by* others is the separate `monitorable` property**, which defaulted to `true` and was never touched, so the hitbox was always detectable regardless of the charge state. Fix: toggle `bark_hitbox.monitorable` instead (`player.gd::_activate_bark_hitbox`), and set `monitorable = false` as its default state in `player.tscn`. **Remember this distinction for any future Area2D-based mechanic** (rival stun detection in 1.4, Zoomies obstacle-destroy in 1.5) — it's an easy trap since both properties sound like the same thing.
+- `on_projectile_hit()` on `player.gd` is a deliberately thin placeholder (red "HIT" flash only) — real hit consequences (revive flow, `GameManager.on_player_hit()`) don't exist yet and shouldn't be built prematurely; this just makes misses visible during playtesting per TDD §13's "definition of done" (debug state overlay shows no input misreads).
+- **User confirmed on real device**: deflect works correctly (bark hitbox only active during the intended window, projectile turns orange and reverses only on genuine overlap, red "HIT" flash shows correctly on a miss) and **feels crisp and instantaneous** — satisfies the project plan's exact 1.3 test question.
+
 ---
 
 ## 3. What's next (in order)
 
-1. **Immediate next action:** start **Milestone 1.3 — Projectile + deflect** (TDD §6, project plan days 7–9):
-   - `projectile.gd`, pooled: spawns with velocity toward the dog (negative X), slight arc allowed for readability.
-   - Bark hitbox: `bark_released(full=true)` should now actually spawn/enable a forward `Area2D` hitbox (`bark_range_units` long, TDD §5) for a few frames instead of just the placeholder flash added in 1.2 — check overlap against the projectile.
-   - On overlap with active bark hitbox → deflect: `velocity.x *= -1` (+ small speed bonus), flip sprite, tag `deflected = true`.
-   - For 1.3 there's no rival yet (that's 1.4) — spawn projectiles on a simple timer for testing purposes only, aimed at the player.
-   - Off-screen → return to pool (don't `queue_free`/reinstantiate every time — TDD §12 mobile GC hygiene).
-   - Test question (project plan): **does the deflect feel crisp and instantaneous?**
+1. **Immediate next action:** start **Milestone 1.4 — Vacuum AI** (TDD §7, project plan days 10–12):
+   - `rival_base.gd`, built as a base class so guest monsters are pure reskins later (override sprites/SFX/art only).
+   - States: `CHASING` (default, holds ~`rival_target_distance` units ahead of player with soft rubber-banding + `rival_distance_variation` noise, per TDD §7.2's chase math), `THROWING` (telegraph anim → spawn projectile via the real projectile system from 1.3 → back to CHASING), `STUNNED` (entered via `on_deflect_hit()`, sparks/slows, `stun_duration_s` timer), `REACT` (brief interrupt layer for non-stun hits).
+   - **Replace `projectile_spawner.gd`'s test-only timer with the rival's own THROWING state** — the spawner was explicitly built as a stand-in for this (see §2 above). Timer: uniform random in `[throw_interval_min_s, throw_interval_max_s]`, re-rolled each throw.
+   - Deflected projectile overlapping rival → `rival.on_deflect_hit()` (not implemented in 1.3 — the projectile currently just reverses and flies off; wiring it to actually detect/react to the rival is new work here). This reuses the same `monitoring`/`monitorable` Area2D pattern from 1.3 — remember the distinction documented above.
+   - `CAUGHT`/`chomped` state exists in the state list per TDD §7.1 but its actual trigger (zoomies + stun overlap) is Milestone 1.5 — don't wire the chomp interaction yet, just leave the state defined.
+   - Test question (project plan): **does it feel like an active nuisance, not a goalpost?**
 2. Continue Phase 1 ("The Ugly Capsule" prototype) milestone by milestone, exactly as sequenced in `bark_and_chomp_project_plan.md` §PHASE 1:
    - [x] 1.1 Movement — confirmed working on-device (see §2 debugging journey above).
    - [x] 1.2 Bark input state machine — confirmed working on-device (see §2 above): squash cue on charge, BLAST/WHIMPER debug label, zero accidental whimpers on intended hops.
-   - [ ] 1.3 Projectile + deflect — next up, see above.
-   - [ ] 1.4 Placeholder vacuum AI (chase distance, throw timer, stun state).
+   - [x] 1.3 Projectile + deflect — confirmed working on-device (see §2 above): deflect feels crisp and instantaneous.
+   - [ ] 1.4 Placeholder vacuum AI — next up, see above.
    - [ ] 1.5 Treats, Zoomie meter, Chomp.
    - [ ] 1.6 The Critical Test — full sequence playtest with 3–5 people, silent observation.
 3. **GO/NO-GO gate at end of Phase 1.6**: only proceed to Phase 2 (art/sound vertical slice) if the ugly prototype is instinctively fun. Do not skip this gate.

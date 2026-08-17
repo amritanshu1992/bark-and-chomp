@@ -13,11 +13,18 @@ const LABEL_FLASH_S := 0.4
 @onready var input_controller: Node = $InputController
 @onready var visual: ColorRect = $Visual
 @onready var debug_label: Label = $UI/DebugLabel
+@onready var bark_hitbox: Area2D = $BarkHitbox
+@onready var bark_hitbox_shape: CollisionShape2D = $BarkHitbox/CollisionShape2D
 
 func _ready() -> void:
 	input_controller.hop_requested.connect(_on_hop_requested)
 	input_controller.charge_started.connect(_on_charge_started)
 	input_controller.bark_released.connect(_on_bark_released)
+
+	var shape := RectangleShape2D.new()
+	shape.size = Vector2(tuning.bark_range_units * PX_PER_UNIT, 96.0)
+	bark_hitbox_shape.shape = shape
+	bark_hitbox_shape.position = Vector2(shape.size.x / 2.0, 0.0)
 
 func _physics_process(delta: float) -> void:
 	velocity.x = tuning.run_speed * PX_PER_UNIT
@@ -42,8 +49,19 @@ func _on_bark_released(full: bool) -> void:
 	visual.scale = Vector2.ONE
 	if full:
 		_flash(Color(1.0, 0.6, 0.1), "BLAST")
+		_activate_bark_hitbox()
 	else:
 		_flash(Color(0.75, 0.75, 0.75), "WHIMPER")
+
+func _activate_bark_hitbox() -> void:
+	bark_hitbox.monitorable = true
+	await get_tree().create_timer(tuning.bark_hitbox_duration_s).timeout
+	bark_hitbox.monitorable = false
+
+func on_projectile_hit() -> void:
+	## Placeholder "ouch" cue — real hit consequences (revive flow, GameManager)
+	## land in a later phase; this just makes misses visible during playtesting.
+	_flash(Color(1.0, 0.0, 0.0), "HIT")
 
 func _flash(color: Color, text: String) -> void:
 	visual.modulate = color

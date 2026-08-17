@@ -1,8 +1,9 @@
-[gd_scene load_steps=5 format=3]
+[gd_scene load_steps=6 format=3]
 
 [ext_resource type="PackedScene" path="res://scenes/player.tscn" id="1"]
 [ext_resource type="PackedScene" path="res://scenes/obstacle.tscn" id="2"]
 [ext_resource type="Script" path="res://scripts/main.gd" id="3"]
+[ext_resource type="Script" path="res://scripts/projectile_spawner.gd" id="4"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_1"]
 size = Vector2(20000, 200)
@@ -29,6 +30,9 @@ position = Vector2(200, 500)
 
 [node name="Obstacle" parent="." instance=ExtResource("2")]
 position = Vector2(900, 552)
+
+[node name="ProjectileSpawner" type="Node" parent="."]
+script = ExtResource("4")
 
 [node name="UI" type="CanvasLayer" parent="."]
 

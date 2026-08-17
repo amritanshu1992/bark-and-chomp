@@ -1,6 +1,6 @@
 # Handoff — "Bark & Chomp"
 
-Last updated: 2026-08-18 (session 2, end)
+Last updated: 2026-08-18 (session 3)
 
 Purpose: read this first at the start of a new session to pick up exactly where things left off. It is a living doc — update it at the end of each session.
 
@@ -71,24 +71,32 @@ Still open, but not blocking progression to 1.2:
 
 **Lesson for future sessions**: don't mark a milestone "confirmed working" from a single playtest report or an `AskUserQuestion` answer given before the actual test happened — three real bugs surfaced across four playtest iterations here. Wait for an explicit, specific confirmation after the fix is deployed.
 
+**Milestone 1.2 — Bark input state machine: done, confirmed on-device.**
+- `input_controller.gd`'s tap/hold state machine was already fully built in Milestone 1.1 (IDLE/TIMING/CHARGING/COOLDOWN, 150ms/400ms thresholds); this milestone wired its `charge_started`/`bark_released(full)` signals into `player.gd` for the first time, plus `hop_requested` now also drives the debug label.
+- `player.gd`: on `charge_started` the capsule visual squashes (`scale = Vector2(1.3, 0.65)`, pivot centered via `pivot_offset` on the `Visual` ColorRect so it doesn't drift); on `bark_released` it flashes orange "BLAST" (full charge ≥400ms) or grey "WHIMPER" (released 150–400ms) for 0.4s via `modulate`, then reverts to white. `hop_requested` flashes "HOP" the same way.
+- Added a `UI`/`DebugLabel` (`CanvasLayer` + `Label`, yellow text w/ black outline, top-left) inside `player.tscn` itself — self-contained per-player debug overlay, per TDD §4.2/§13's "debug state overlay shows no input misreads" requirement.
+- No bark hitbox / projectile deflect logic yet — that's explicitly Milestone 1.3 scope (TDD §6), not touched here. This milestone is pure input-feedback plumbing.
+- **User confirmed on real device**: quick taps hop cleanly with zero accidental whimpers, and CHARGING/BLAST/WHIMPER all displayed distinctly and correctly. This satisfies the project plan's exact 1.2 test question ("zero accidental whimpers when the player intended a hop").
+
 ---
 
 ## 3. What's next (in order)
 
-1. **Immediate next action:** commit all pending changes (bug fixes from this session's playtest debugging, restart button, corrected handoff.md) and push.
-2. Start **Milestone 1.2 — Bark input state machine**: the tap/hold state machine is already fully built in `input_controller.gd` (IDLE/TIMING/CHARGING/COOLDOWN, `charge_started`/`bark_released`/`zoomie_nudge_requested` signals) but only `hop_requested` is wired into `player.gd` so far. Remaining work:
-   - Wire `charge_started` → visual squash feedback on the capsule.
-   - Wire `bark_released(full)` → placeholder bark/whimper feedback (full charge vs. released early).
-   - Add the HOP/CHARGING/BLAST/WHIMPER debug HUD label (Phase 1 requirement, TDD §4.2) so state is visible during playtests.
-   - Deploy to device and playtest: does the 150ms tap/hold threshold feel right against real touchscreen latency? (Open item carried over from 1.1.)
-3. Continue Phase 1 ("The Ugly Capsule" prototype) milestone by milestone, exactly as sequenced in `bark_and_chomp_project_plan.md` §PHASE 1:
-   - [x] 1.1 Movement — code done, **on-device playtest complete and confirmed working** (see §2 debugging journey above).
-   - [ ] 1.2 Bark input state machine — next up, see above.
-   - [ ] 1.3 Projectile + deflect.
+1. **Immediate next action:** start **Milestone 1.3 — Projectile + deflect** (TDD §6, project plan days 7–9):
+   - `projectile.gd`, pooled: spawns with velocity toward the dog (negative X), slight arc allowed for readability.
+   - Bark hitbox: `bark_released(full=true)` should now actually spawn/enable a forward `Area2D` hitbox (`bark_range_units` long, TDD §5) for a few frames instead of just the placeholder flash added in 1.2 — check overlap against the projectile.
+   - On overlap with active bark hitbox → deflect: `velocity.x *= -1` (+ small speed bonus), flip sprite, tag `deflected = true`.
+   - For 1.3 there's no rival yet (that's 1.4) — spawn projectiles on a simple timer for testing purposes only, aimed at the player.
+   - Off-screen → return to pool (don't `queue_free`/reinstantiate every time — TDD §12 mobile GC hygiene).
+   - Test question (project plan): **does the deflect feel crisp and instantaneous?**
+2. Continue Phase 1 ("The Ugly Capsule" prototype) milestone by milestone, exactly as sequenced in `bark_and_chomp_project_plan.md` §PHASE 1:
+   - [x] 1.1 Movement — confirmed working on-device (see §2 debugging journey above).
+   - [x] 1.2 Bark input state machine — confirmed working on-device (see §2 above): squash cue on charge, BLAST/WHIMPER debug label, zero accidental whimpers on intended hops.
+   - [ ] 1.3 Projectile + deflect — next up, see above.
    - [ ] 1.4 Placeholder vacuum AI (chase distance, throw timer, stun state).
    - [ ] 1.5 Treats, Zoomie meter, Chomp.
    - [ ] 1.6 The Critical Test — full sequence playtest with 3–5 people, silent observation.
-4. **GO/NO-GO gate at end of Phase 1.6**: only proceed to Phase 2 (art/sound vertical slice) if the ugly prototype is instinctively fun. Do not skip this gate.
+3. **GO/NO-GO gate at end of Phase 1.6**: only proceed to Phase 2 (art/sound vertical slice) if the ugly prototype is instinctively fun. Do not skip this gate.
 
 **Reusable dev tooling now in place** (built during 1.1, applies to all future milestones):
 - Full build→deploy→test loop: `Godot_..._console.exe --headless --path "." --export-debug "Android" "builds/android/bark_and_chomp.apk"` → `adb install -r <apk>` → `adb shell am force-stop com.barkandchomp.game` → `adb shell monkey -p com.barkandchomp.game -c android.intent.category.LAUNCHER 1`.

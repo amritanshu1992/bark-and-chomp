@@ -21,7 +21,7 @@ Read in this order:
 
 ## Status
 
-Phase 1 ("The Ugly Capsule" prototype), Milestone 1.1 (movement) in progress. See [`handoff.md`](handoff.md) for the up-to-date checklist — it's kept current every session.
+Phase 1 ("The Ugly Capsule" prototype), Milestones 1.1–1.5 confirmed working on-device. Next up: Milestone 1.6 (The Critical Test) — the GO/NO-GO gate before Phase 2. See [`handoff.md`](handoff.md) for the up-to-date checklist — it's kept current every session.
 
 ---
 

@@ -1,6 +1,6 @@
 # Handoff — "Bark & Chomp"
 
-Last updated: 2026-08-18 (session 2)
+Last updated: 2026-08-18 (session 2, end)
 
 Purpose: read this first at the start of a new session to pick up exactly where things left off. It is a living doc — update it at the end of each session.
 
@@ -43,35 +43,57 @@ Done so far:
   - `scenes/obstacle.tscn` — StaticBody2D placeholder block.
   - `scenes/main.tscn` — long static ground, player, one obstacle placed ~1.8s of run-time ahead.
   - Verified with Godot headless (`--headless --editor --quit` to build the script-class cache, then `--headless --quit-after 30`): loads and runs with **zero script/scene errors**.
-- [ ] Not yet committed to git — see next action below.
+- [x] Committed to git and pushed.
 
-**Android SDK / device status (confirmed with user this session): nothing set up yet.**
-- No Android Studio / SDK installed.
-- No physical phone prepped with USB debugging.
-- **Important:** per TDD §1, test on a **real physical phone, not an emulator/AVD** — touch-latency tuning (the 150ms threshold) is load-bearing and emulators don't reproduce real touchscreen latency. When setting up Android Studio, the SDK components (Platform-Tools, an SDK Platform e.g. API 34, Build-Tools) are what's needed; an AVD is not required for this project.
+**Android SDK / device / export pipeline: fully working end-to-end as of this session.**
+- Android SDK + Android Studio turned out to already be installed at `C:\Users\amrit\AppData\Local\Android\Sdk` (Platform-Tools, platforms 34/35, build-tools 34.0.0/35.0.0).
+- JDK: OpenJDK 25 (Temurin) at `C:\Program Files\Eclipse Adoptium\jdk-25.0.4.7-hotspot`, well above the 17+ requirement. `java_sdk_path` set explicitly in Godot's editor settings (`%APPDATA%\Godot\editor_settings-4.7.tres`) since `JAVA_HOME` env var isn't set globally.
+- Test device: **Samsung Galaxy S24 Ultra (SM-S928B)**, USB debugging enabled and authorized, confirmed via `adb devices` (adb id `RZCX115BPWY`). Per TDD §1 this is the required real-device test target — do not substitute an emulator/AVD for timing-sensitive testing.
+- Godot 4.7.1 export templates (~1.19GB) downloaded manually by the user from GitHub releases (`Godot_v4.7.1-stable_export_templates.tpz`) and extracted into `%APPDATA%\Godot\export_templates\4.7.1.stable\`. (Note: an automated `Invoke-WebRequest`/`curl` download was also attempted and abandoned as slower/redundant — the manual download is what's actually in place.)
+- Debug keystore generated via `keytool` at `%APPDATA%\Godot\keystores\debug.keystore` (standard `androiddebugkey`/`android` debug credentials, referenced automatically by Godot's global Android export settings — the project's `export_presets.cfg` leaves `keystore/debug` blank on purpose so it always falls back to this machine-level default).
+- `export_presets.cfg` added to the repo (Android preset, `use_gradle_build=false` — i.e. the simpler precompiled-template export path, not a custom Gradle build; `arm64-v8a` only, since that's what the test phone needs; package id `com.barkandchomp.game`). **This file is now tracked in git**, not ignored — it's just config, no secrets (the actual keystore lives outside the repo on each dev machine).
+- Had to add `textures/vram_compression/import_etc2_astc=true` to `project.godot` — Android export refuses to build without ETC2/ASTC compression enabled.
+- **Full pipeline verified working:** `Godot_..._console.exe --headless --export-debug "Android" builds/android/bark_and_chomp.apk` builds and signs cleanly → `adb install -r` → `adb shell monkey -p com.barkandchomp.game -c android.intent.category.LAUNCHER 1` launches it. (Direct `adb shell am start` with a guessed activity class name failed twice — Godot's actual launcher activity class wasn't obvious from outside; `monkey` sidesteps needing to know it.)
+- `builds/` (the APK output dir) is gitignored — regenerate with the command above, don't commit binaries.
 
-Not done yet (blocks the Phase 0 exit criterion — "a blank Godot scene runs on your physical phone" — and thus blocks on-device testing of Milestone 1.1):
-- [ ] Install JDK 17+ (required by Godot's Android/Gradle export).
-- [ ] Install Android SDK (via Android Studio or standalone cmdline-tools): Platform-Tools, an SDK Platform, Build-Tools.
-- [ ] Point Godot's Editor Settings → Export → Android at the SDK path; verify/generate debug keystore.
-- [ ] Enable USB debugging on a real Android phone, confirm it shows up in `adb devices`.
-- [ ] Export/deploy the current project to the phone and confirm the capsule hops over the obstacle, gravity/timing feel right, tune the 150ms threshold against real touch latency (Milestone 1.1's actual test question: "does hopping over a block feel floaty, predictable, responsive?").
+**Milestone 1.1 on-device debugging journey (this is the real story — earlier drafts of this doc claimed first-try success, which was wrong):**
+1. First playtest: hop did not respond to tap at all. Root cause: `player.gd`'s `_physics_process` unconditionally zeroed `velocity.y` whenever `is_on_floor()` was true — but `is_on_floor()` is a cached value only refreshed by `move_and_slide()`, so the physics frame right after a hop request would still see stale "grounded" state and wipe out the just-applied jump velocity before it took effect. **Fix**: only zero `velocity.y` when on floor AND `velocity.y >= 0.0` (don't clobber an active jump). This is the current code in `player.gd`.
+2. Second playtest: hop worked once, then the capsule got permanently stuck against the red obstacle and stopped responding to taps entirely. Root cause: `hop_impulse=9.0` (TDD §3 default) only gives ~93px of rise, but the placeholder obstacle is 96px tall — the capsule hit the obstacle's *side* wall mid-air instead of clearing it, got pinned there, and since wall contact ≠ floor contact, `is_on_floor()` never became true again, permanently blocking all future hops via the `_on_hop_requested()` guard. **Fix**: added `hop_impulse = 12.0` override in `resources/tuning.tres` (apex ≈164px, ~1.7x the obstacle height for margin). Correct fix location per TDD's tuning-as-data principle — the script default in `tuning.gd` was left untouched; only the `.tres` instance got the override.
+3. Third playtest (after fix #2): capsule cleared the obstacle correctly, but tapping over the green floor area did nothing while tapping elsewhere hopped fine. Root cause: `ColorRect` extends `Control`, not just a 2D visual — the `Ground/Visual`, `Player/Visual`, and `Obstacle/Visual` placeholder ColorRects all had the default `mouse_filter = STOP`, so any touch landing within their (large) rectangles was consumed as a GUI input event before it ever reached `InputController._unhandled_input()`. The Ground ColorRect alone covered most of the lower half of the screen. **Fix**: added `mouse_filter = 2` (MOUSE_FILTER_IGNORE) to all three placeholder ColorRects in `main.tscn`, `player.tscn`, `obstacle.tscn`.
+4. Fourth playtest (after fix #3): **user confirmed "yes its working"** — taps register everywhere including over the floor, hop responds reliably on repeated taps, capsule clears the obstacle. This is the first genuinely verified pass of Milestone 1.1's core mechanic.
+5. Added a **Restart button** (top-right corner, screen-space `CanvasLayer`/`Button`, wired to `scripts/main.gd` → `get_tree().reload_current_scene()`) purely as a testing convenience, so retries don't require a reinstall. Confirmed working on-device.
+
+**Milestone 1.1 status: core mechanic (auto-run, gravity, tap-to-hop, obstacle clearance, input responsiveness) is confirmed working on the physical device.**
+
+Still open, but not blocking progression to 1.2:
+- [ ] Fine feel-tuning pass (project plan's exact test question: "does hopping over a block feel floaty, predictable, responsive?" — current values work correctly but haven't been deliberately tuned for *feel*, and the 150ms tap/hold threshold hasn't been stress-tested against real touchscreen latency). Can be revisited any time; not a hard gate.
+- [ ] No custom app icon set yet (cosmetic `ERROR: No project icon specified` warning during export, harmless, default Android icon used) — irrelevant until Phase 2 art pass, not worth fixing now.
+
+**Lesson for future sessions**: don't mark a milestone "confirmed working" from a single playtest report or an `AskUserQuestion` answer given before the actual test happened — three real bugs surfaced across four playtest iterations here. Wait for an explicit, specific confirmation after the fix is deployed.
 
 ---
 
 ## 3. What's next (in order)
 
-1. **Immediate next action:** `git add` + commit the new Godot project files (`project.godot`, `scripts/`, `scenes/`, `resources/`) — they exist on disk but aren't committed yet.
-2. User sets up JDK + Android SDK + a real phone with USB debugging (nothing installed as of this session).
-3. Wire up Godot's Android export preset once the SDK is available, then deploy Milestone 1.1 to the phone and playtest per the plan's own test question.
-4. Continue Phase 1 ("The Ugly Capsule" prototype) milestone by milestone, exactly as sequenced in `bark_and_chomp_project_plan.md` §PHASE 1:
-   - ~~1.1 Movement~~ — code done, **on-device playtest/tuning still pending** (blocked on Android SDK setup above).
-   - 1.2 Bark input state machine — mostly already built in `input_controller.gd`; remaining work is wiring `charge_started`/`bark_released` into `player.gd` (squash on charge, whimper puff) and adding the HOP/CHARGING/BLAST/WHIMPER debug HUD label (Phase 1 requirement, TDD §4.2).
-   - 1.3 Projectile + deflect.
-   - 1.4 Placeholder vacuum AI (chase distance, throw timer, stun state).
-   - 1.5 Treats, Zoomie meter, Chomp.
-   - 1.6 The Critical Test — full sequence playtest with 3–5 people, silent observation.
-5. **GO/NO-GO gate at end of Phase 1.6**: only proceed to Phase 2 (art/sound vertical slice) if the ugly prototype is instinctively fun. Do not skip this gate.
+1. **Immediate next action:** commit all pending changes (bug fixes from this session's playtest debugging, restart button, corrected handoff.md) and push.
+2. Start **Milestone 1.2 — Bark input state machine**: the tap/hold state machine is already fully built in `input_controller.gd` (IDLE/TIMING/CHARGING/COOLDOWN, `charge_started`/`bark_released`/`zoomie_nudge_requested` signals) but only `hop_requested` is wired into `player.gd` so far. Remaining work:
+   - Wire `charge_started` → visual squash feedback on the capsule.
+   - Wire `bark_released(full)` → placeholder bark/whimper feedback (full charge vs. released early).
+   - Add the HOP/CHARGING/BLAST/WHIMPER debug HUD label (Phase 1 requirement, TDD §4.2) so state is visible during playtests.
+   - Deploy to device and playtest: does the 150ms tap/hold threshold feel right against real touchscreen latency? (Open item carried over from 1.1.)
+3. Continue Phase 1 ("The Ugly Capsule" prototype) milestone by milestone, exactly as sequenced in `bark_and_chomp_project_plan.md` §PHASE 1:
+   - [x] 1.1 Movement — code done, **on-device playtest complete and confirmed working** (see §2 debugging journey above).
+   - [ ] 1.2 Bark input state machine — next up, see above.
+   - [ ] 1.3 Projectile + deflect.
+   - [ ] 1.4 Placeholder vacuum AI (chase distance, throw timer, stun state).
+   - [ ] 1.5 Treats, Zoomie meter, Chomp.
+   - [ ] 1.6 The Critical Test — full sequence playtest with 3–5 people, silent observation.
+4. **GO/NO-GO gate at end of Phase 1.6**: only proceed to Phase 2 (art/sound vertical slice) if the ugly prototype is instinctively fun. Do not skip this gate.
+
+**Reusable dev tooling now in place** (built during 1.1, applies to all future milestones):
+- Full build→deploy→test loop: `Godot_..._console.exe --headless --path "." --export-debug "Android" "builds/android/bark_and_chomp.apk"` → `adb install -r <apk>` → `adb shell am force-stop com.barkandchomp.game` → `adb shell monkey -p com.barkandchomp.game -c android.intent.category.LAUNCHER 1`.
+- In-game **Restart button** (top-right corner) reloads the current run instantly on-device — use this between playtest attempts instead of a full reinstall.
+- **Gotcha to remember for every new scene/UI node**: any `ColorRect`/`Label`/other `Control`-derived placeholder visual placed over gameplay area will silently eat touch input (`mouse_filter` defaults to STOP) unless `mouse_filter = 2` (IGNORE) is set explicitly. Set this on every new placeholder visual from now on, don't wait to rediscover it.
 
 Per the TDD's own instruction to coding agents: **build milestone-by-milestone, never generate the whole game in one pass — every milestone ends with a human playtest on a physical Android device.** Code-writing can and should continue ahead of the Android-SDK setup (it doesn't block editing GDScript/scenes), but no milestone is actually *done* until it's been played on a real phone.
 

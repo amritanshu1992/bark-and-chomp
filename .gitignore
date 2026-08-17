@@ -2,7 +2,9 @@
 .godot/
 .import/
 export.cfg
-export_presets.cfg
+
+# Build output (regenerate with `godot --export-debug "Android" ...`)
+builds/
 
 # Godot-specific build artifacts
 *.translation

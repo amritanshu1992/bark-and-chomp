@@ -14,7 +14,7 @@ func _ready() -> void:
 func _physics_process(delta: float) -> void:
 	velocity.x = tuning.run_speed * PX_PER_UNIT
 
-	if is_on_floor():
+	if is_on_floor() and velocity.y >= 0.0:
 		velocity.y = 0.0
 	else:
 		velocity.y += tuning.gravity * PX_PER_UNIT * delta

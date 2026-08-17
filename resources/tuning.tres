@@ -4,3 +4,4 @@
 
 [resource]
 script = ExtResource("1")
+hop_impulse = 12.0

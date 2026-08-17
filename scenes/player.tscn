@@ -18,6 +18,7 @@ offset_left = -32.0
 offset_top = -48.0
 offset_right = 32.0
 offset_bottom = 48.0
+mouse_filter = 2
 color = Color(1, 1, 1, 1)
 
 [node name="InputController" type="Node" parent="."]

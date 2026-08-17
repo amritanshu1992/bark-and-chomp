@@ -13,7 +13,7 @@ extends Resource
 @export var bark_range_units := 2.5     # 2-3 dog lengths
 @export var bark_hitbox_duration_s := 0.15  # "a few frames" per TDD Sec4.2
 
-# Projectile (Milestone 1.3 test-only spawner; real timing owned by rival_base.gd from 1.4)
+# Projectile
 @export var projectile_speed := 8.0     # u/s, toward player
 
 # Zoomies
@@ -28,10 +28,13 @@ extends Resource
 @export var deflect_hit_meter_value := 20.0  # deflects feed meter (stun/meter sync fix)
 
 # Rival
-@export var rival_target_distance := 6.0
+@export var rival_target_distance := 8.5     # bumped from plan's 6.0 -- playtest found throws too close/fast to react to
 @export var rival_distance_variation := 0.75  # +/-0.5-1.0
+@export var rival_rubber_band_k := 2.0        # chase correction strength
+@export var rival_max_adjust := 3.0           # u/s clamp on rubber-band correction
 @export var throw_interval_min_s := 3.0
 @export var throw_interval_max_s := 4.0
+@export var throw_telegraph_s := 0.65         # must clear bark_full_charge_ms with margin to react
 @export var stun_duration_s := 2.5      # tune upward if chomps too rare
 
 # Economy (Phase 3)

@@ -1,8 +1,8 @@
 extends Area2D
 
 ## Milestone 1.3: pooled projectile, flies at the dog, deflected by an active bark hitbox.
-## Spawned by projectile_spawner.gd for now (test-only timer); a real rival throws it
-## from Milestone 1.4 onward. Rival-side deflect reactions (stun, meter) aren't wired yet.
+## Milestone 1.4: thrown by rival_base.gd; once deflected, hitting the rival's Area2D
+## triggers its on_deflect_hit() stun reaction instead of just passing through.
 
 signal returned_to_pool(projectile: Area2D)
 
@@ -35,12 +35,17 @@ func _physics_process(delta: float) -> void:
 	if _age >= MAX_LIFETIME_S:
 		_return_to_pool()
 
-func _on_area_entered(_area: Area2D) -> void:
-	if deflected:
-		return
-	deflected = true
-	velocity_x = absf(velocity_x) * 1.15
-	visual.modulate = Color(1.0, 0.5, 0.0)
+func _on_area_entered(area: Area2D) -> void:
+	if area.is_in_group("bark_hitbox"):
+		if deflected:
+			return
+		deflected = true
+		velocity_x = absf(velocity_x) * 1.15
+		visual.modulate = Color(1.0, 0.5, 0.0)
+	elif area.is_in_group("rival"):
+		if deflected and area.has_method("on_deflect_hit"):
+			area.on_deflect_hit()
+			_return_to_pool()
 
 func _on_body_entered(body: Node2D) -> void:
 	if deflected:

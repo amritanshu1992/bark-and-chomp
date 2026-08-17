@@ -1,6 +1,6 @@
 # Handoff — "Bark & Chomp"
 
-Last updated: 2026-08-18 (session 3, continued)
+Last updated: 2026-08-18 (session 4)
 
 Purpose: read this first at the start of a new session to pick up exactly where things left off. It is a living doc — update it at the end of each session.
 
@@ -87,23 +87,32 @@ Still open, but not blocking progression to 1.2:
 - `on_projectile_hit()` on `player.gd` is a deliberately thin placeholder (red "HIT" flash only) — real hit consequences (revive flow, `GameManager.on_player_hit()`) don't exist yet and shouldn't be built prematurely; this just makes misses visible during playtesting per TDD §13's "definition of done" (debug state overlay shows no input misreads).
 - **User confirmed on real device**: deflect works correctly (bark hitbox only active during the intended window, projectile turns orange and reverses only on genuine overlap, red "HIT" flash shows correctly on a miss) and **feels crisp and instantaneous** — satisfies the project plan's exact 1.3 test question.
 
+**Milestone 1.4 — Vacuum AI: done, confirmed on-device.**
+- `scripts/rival_base.gd` (new, `class_name RivalBase extends Area2D`) + `scenes/rival.tscn`: placeholder vacuum, built as a base class per TDD §7 so guest monsters can later be pure reskins. States implemented: `CHASING` (rubber-band chase math per TDD §7.2, `desired_x = player.x + rival_target_distance + noise`, correction clamped by `rival_max_adjust`), `THROWING` (telegraph → spawn via its own pooled projectile → back to `CHASING`), `REACT`/`STUNNED` (entered via `on_deflect_hit()`), `CAUGHT` reserved in the enum but not wired — that's Milestone 1.5 (Zoomies/Chomp).
+- Replaced Milestone 1.3's test-only `projectile_spawner.gd` (deleted) with the rival owning its own pooled throw timer, as planned. `main.tscn`'s `ProjectileSpawner` node swapped for a `Rival` instance.
+- `projectile.gd`'s `_on_area_entered` now branches on `is_in_group("bark_hitbox")` (existing deflect behavior) vs `is_in_group("rival")` (calls `rival.on_deflect_hit()` then returns to pool). `BarkHitbox` in `player.tscn` and `Rival` in `rival.tscn` both tagged with their respective groups. New collision layer `rival=16`; `projectile.tscn`'s `collision_mask` updated `10 → 26` to add it. Rival's `Area2D` set `monitoring=false, monitorable=true` permanently (always deflect-hittable, no toggling needed — unlike the player's bark hitbox which does need to toggle `monitorable`, per the 1.3 gotcha).
+- **Three real bugs surfaced across on-device playtests, all fixed:**
+  1. Throw wind-up was too short and too subtle (`throw_telegraph_s=0.35`, plain color tint on a small ColorRect) — shorter than the 400ms full-charge threshold itself, so there was no way to react in time. **Fix**: bumped `throw_telegraph_s` to 0.65 in `tuning.gd`, and made the cue much louder (`rival_base.gd::_start_throw` now flashes bright red *and* scales the visual up to 1.4x, not just a subtle tint). Needed `pivot_offset = Vector2(40, 40)` on `rival.tscn`'s `Visual` ColorRect so the scale-up is centered instead of drifting.
+  2. Projectiles spawn from the rival's actual position, which per the project plan's `rival_target_distance=6.0` units is much closer than Milestone 1.3's test-spawner (`SPAWN_AHEAD_PX=700px` vs 6 units×64=384px) — noticeably less flight time/reaction room than what 1.3 was tuned and confirmed against. **Fix**: bumped `rival_target_distance` to 8.5 in `tuning.gd` (deliberate playtest-driven deviation from the plan's "~6 units" — noted here per `CLAUDE.md`'s divergence-tracking instruction). Also updated the `Rival` node's initial spawn offset in `main.tscn` to match.
+  3. After a deflect-hit, the vacuum froze completely in world-space for the whole REACT+STUNNED window (~2.8s) while the player kept auto-running — so the player would catch up to and run past the stationary vacuum (read as "it comes at me"), then it would be left behind off the left edge of the camera for several seconds before a slow rubber-band catch-up brought it back. **Fix** (`rival_base.gd::_physics_process`): `STUNNED` now moves the rival forward at the player's base `run_speed` with no active herding/throwing (keeps pace instead of literally freezing — still visually reads as stunned via the grey tint, but doesn't fall behind or get run through). `on_deflect_hit()` also still snaps to the ideal chase distance the instant `STUNNED` ends, as a cheap stand-in for the "escape animation" TDD §7.4 calls for.
+- **User confirmed on real device** ("it feels much better" after fix #3, then explicit answer via `AskUserQuestion`): **yes, active nuisance, not a goalpost** — satisfies the project plan's exact 1.4 test question.
+
 ---
 
 ## 3. What's next (in order)
 
-1. **Immediate next action:** start **Milestone 1.4 — Vacuum AI** (TDD §7, project plan days 10–12):
-   - `rival_base.gd`, built as a base class so guest monsters are pure reskins later (override sprites/SFX/art only).
-   - States: `CHASING` (default, holds ~`rival_target_distance` units ahead of player with soft rubber-banding + `rival_distance_variation` noise, per TDD §7.2's chase math), `THROWING` (telegraph anim → spawn projectile via the real projectile system from 1.3 → back to CHASING), `STUNNED` (entered via `on_deflect_hit()`, sparks/slows, `stun_duration_s` timer), `REACT` (brief interrupt layer for non-stun hits).
-   - **Replace `projectile_spawner.gd`'s test-only timer with the rival's own THROWING state** — the spawner was explicitly built as a stand-in for this (see §2 above). Timer: uniform random in `[throw_interval_min_s, throw_interval_max_s]`, re-rolled each throw.
-   - Deflected projectile overlapping rival → `rival.on_deflect_hit()` (not implemented in 1.3 — the projectile currently just reverses and flies off; wiring it to actually detect/react to the rival is new work here). This reuses the same `monitoring`/`monitorable` Area2D pattern from 1.3 — remember the distinction documented above.
-   - `CAUGHT`/`chomped` state exists in the state list per TDD §7.1 but its actual trigger (zoomies + stun overlap) is Milestone 1.5 — don't wire the chomp interaction yet, just leave the state defined.
-   - Test question (project plan): **does it feel like an active nuisance, not a goalpost?**
+1. **Immediate next action:** start **Milestone 1.5 — Treats, Zoomie meter, Chomp** (TDD, project plan):
+   - Treat pickups (pooled, per TDD §6-style pattern) feeding the Zoomie meter (`meter_max`, `treat_meter_value`); deflect-hits already feed the meter too (`deflect_hit_meter_value`, wired since 1.3/1.4).
+   - Zoomies burst: `zoomie_duration_s`, `zoomie_speed_mult`, tap-steering via `zoomie_nudge_impulse` (input controller already emits `zoomie_nudge_requested`, unused until now).
+   - CHOMP: preconditions are zoomies active AND rival `STUNNED`; wires up the `CAUGHT` state left reserved-but-unimplemented in `rival_base.gd` since 1.4 — `chomp_window_s` is the steer-and-line-up window (project plan: "~1.5s window to line up → CHOMP").
+   - Hit: dust-bag-burst placeholder reaction, treat payout, rival respawns further ahead (reuse the same "snap to ideal chase distance" pattern already used for the post-stun recovery in `rival_base.gd`). Miss: rival just recovers to CHASING, no punishment beyond the lost opportunity (GDD §6).
+   - Test question (project plan, §1.5): does landing a CHOMP feel like a payoff worth chasing?
 2. Continue Phase 1 ("The Ugly Capsule" prototype) milestone by milestone, exactly as sequenced in `bark_and_chomp_project_plan.md` §PHASE 1:
    - [x] 1.1 Movement — confirmed working on-device (see §2 debugging journey above).
    - [x] 1.2 Bark input state machine — confirmed working on-device (see §2 above): squash cue on charge, BLAST/WHIMPER debug label, zero accidental whimpers on intended hops.
    - [x] 1.3 Projectile + deflect — confirmed working on-device (see §2 above): deflect feels crisp and instantaneous.
-   - [ ] 1.4 Placeholder vacuum AI — next up, see above.
-   - [ ] 1.5 Treats, Zoomie meter, Chomp.
+   - [x] 1.4 Placeholder vacuum AI — confirmed working on-device (see §2 above): feels like an active nuisance, not a goalpost.
+   - [ ] 1.5 Treats, Zoomie meter, Chomp — next up, see above.
    - [ ] 1.6 The Critical Test — full sequence playtest with 3–5 people, silent observation.
 3. **GO/NO-GO gate at end of Phase 1.6**: only proceed to Phase 2 (art/sound vertical slice) if the ugly prototype is instinctively fun. Do not skip this gate.
 

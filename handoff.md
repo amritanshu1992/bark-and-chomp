@@ -114,11 +114,13 @@ Still open, but not blocking progression to 1.2:
 
 ## 3. What's next (in order)
 
-1. **Immediate next action:** start **Milestone 1.6 — The Critical Test** (project plan §1.6):
+1. **Immediate next action:** run **Milestone 1.6 — The Critical Test** (project plan §1.6). **User plans to run this 2026-08-19 ("tomorrow") and report back next session** — no code work is needed for this milestone, it's purely the human playtest.
    - Play the full sequence end-to-end: throw → hop → mid-air charge → perfect release → deflect → vacuum ragdolls → treats explode → Zoomies → chomp.
    - Give it to 3–5 people. Watch them play. Say nothing (no coaching/hinting — that's the point of this gate).
    - This is the **GO/NO-GO gate**: only proceed to Phase 2 (art/sound vertical slice) if the ugly prototype is instinctively fun. Do not skip this gate, and do not substitute your own single-playtest judgment for the "3-5 people, silent observation" protocol the plan specifies.
-   - Worth deciding with the user first: who are the 3-5 testers, and how session feedback gets captured (notes, recording, etc.) — this is a different testing shape than the solo on-device confirms used for 1.1-1.5.
+   - **Agreed protocol** (decided this session): screen-record each tester's session (Samsung's built-in Screen Recorder, mic on to capture reactions), tap the in-game Restart button to reset state between testers (no reinstall needed), say nothing during play. Watch for: does hop-vs-hold discover itself, do they react to the throw telegraph in time, does a deflect land and feel satisfying, do they notice/chase treats, does Zoomies feel like a rush, does a Chomp register as a clear "win" moment (already flagged in 1.5 notes above that the gold catch-flash is subtle — this test will show whether that's a real problem).
+   - The build currently installed on the test device (as of commit `0ef157a`) is the confirmed Milestone 1.5 build — fine to use as-is for 1.6, no rebuild needed unless something changes first.
+   - Next session: get the user's account of what happened (or review recordings together), sort real blockers from placeholder-art nitpicks, and make the GO/NO-GO call together. Do not mark 1.6 done without that.
 2. Phase 1 ("The Ugly Capsule" prototype) status, per `bark_and_chomp_project_plan.md` §PHASE 1:
    - [x] 1.1 Movement — confirmed working on-device (see §2 debugging journey above).
    - [x] 1.2 Bark input state machine — confirmed working on-device (see §2 above): squash cue on charge, BLAST/WHIMPER debug label, zero accidental whimpers on intended hops.

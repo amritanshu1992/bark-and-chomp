@@ -3,6 +3,7 @@ extends Area2D
 ## Milestone 1.3: pooled projectile, flies at the dog, deflected by an active bark hitbox.
 ## Milestone 1.4: thrown by rival_base.gd; once deflected, hitting the rival's Area2D
 ## triggers its on_deflect_hit() stun reaction instead of just passing through.
+## Milestone 1.5: passes through harmlessly during the player's Zoomies invincibility.
 
 signal returned_to_pool(projectile: Area2D)
 
@@ -49,6 +50,9 @@ func _on_area_entered(area: Area2D) -> void:
 
 func _on_body_entered(body: Node2D) -> void:
 	if deflected:
+		return
+	if body.has_method("is_invincible") and body.is_invincible():
+		_return_to_pool()
 		return
 	if body.has_method("on_projectile_hit"):
 		body.on_projectile_hit()

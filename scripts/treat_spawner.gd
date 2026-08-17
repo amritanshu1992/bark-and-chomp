@@ -1,0 +1,39 @@
+extends Node
+
+## Milestone 1.5: periodic treat spawner feeding the Zoomie meter. Endless-world
+## recycling + hop-teaching treat arcs (TDD Sec9's fuller spawner.gd, difficulty-
+## ramp-aware) are out of scope for the fixed Phase-1 prototype track -- this is
+## a plain interval spawner, enough to test meter fill -> Zoomies -> Chomp.
+
+const POOL_SIZE := 6
+const SPAWN_INTERVAL_S := 1.5
+const SPAWN_AHEAD_PX := 500.0
+
+@export var treat_scene: PackedScene = preload("res://scenes/treat.tscn")
+
+@onready var player: Node2D = get_node("../Player")
+
+var _pool: Array[Area2D] = []
+var _timer_s: float = 0.0
+
+func _ready() -> void:
+	for i in POOL_SIZE:
+		var t: Area2D = treat_scene.instantiate()
+		add_child(t)
+		t.returned_to_pool.connect(_on_returned_to_pool)
+		_pool.append(t)
+
+func _process(delta: float) -> void:
+	_timer_s += delta
+	if _timer_s >= SPAWN_INTERVAL_S:
+		_timer_s = 0.0
+		_spawn()
+
+func _spawn() -> void:
+	if _pool.is_empty():
+		return
+	var t: Area2D = _pool.pop_back()
+	t.activate(Vector2(player.global_position.x + SPAWN_AHEAD_PX, player.global_position.y))
+
+func _on_returned_to_pool(t: Area2D) -> void:
+	_pool.append(t)

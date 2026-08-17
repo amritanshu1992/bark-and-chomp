@@ -1,6 +1,6 @@
 # Handoff — "Bark & Chomp"
 
-Last updated: 2026-08-18 (session 4)
+Last updated: 2026-08-18 (session 5)
 
 Purpose: read this first at the start of a new session to pick up exactly where things left off. It is a living doc — update it at the end of each session.
 
@@ -97,24 +97,35 @@ Still open, but not blocking progression to 1.2:
   3. After a deflect-hit, the vacuum froze completely in world-space for the whole REACT+STUNNED window (~2.8s) while the player kept auto-running — so the player would catch up to and run past the stationary vacuum (read as "it comes at me"), then it would be left behind off the left edge of the camera for several seconds before a slow rubber-band catch-up brought it back. **Fix** (`rival_base.gd::_physics_process`): `STUNNED` now moves the rival forward at the player's base `run_speed` with no active herding/throwing (keeps pace instead of literally freezing — still visually reads as stunned via the grey tint, but doesn't fall behind or get run through). `on_deflect_hit()` also still snaps to the ideal chase distance the instant `STUNNED` ends, as a cheap stand-in for the "escape animation" TDD §7.4 calls for.
 - **User confirmed on real device** ("it feels much better" after fix #3, then explicit answer via `AskUserQuestion`): **yes, active nuisance, not a goalpost** — satisfies the project plan's exact 1.4 test question.
 
+**Milestone 1.5 — Treats, Zoomies, Chomp: done, confirmed on-device.**
+- `scripts/treat.gd` + `scenes/treat.tscn`: pooled `Area2D` treat pickup (same `activate()`/`returned_to_pool` pattern as `projectile.gd`), new collision layer `treat=32`, `monitoring` toggled on/off (it's the "detector" scanning for the player body, unlike the rival's always-on `monitorable`).
+- `scripts/treat_spawner.gd` (new, `main.tscn` child): plain interval spawner (`SPAWN_INTERVAL_S=1.5`, `SPAWN_AHEAD_PX=500`, pool of 6) ahead of the player — enough to exercise the meter/Zoomies/Chomp loop for the prototype gate; not the fuller difficulty-ramp-aware spawner TDD §9 describes for later phases.
+- `player.gd`: added `meter`/`zoomies_active` state, `add_meter()`/`on_treat_collected()`/`on_chomp_landed()`, `_start_zoomies()`/`_end_zoomies()`, `is_zoomies_active()`/`is_invincible()` (duck-typed, called by `projectile.gd` and `rival_base.gd`), a screen-space meter bar (`UI/MeterBarBg`+`MeterBarFill` `ColorRect`s added to `player.tscn`), zoomies speed multiplier + obstacle-destroy-on-contact in `_physics_process`, and tap-nudge steering via the already-built `zoomie_nudge_requested` signal.
+- `scenes/obstacle.tscn` tagged `groups=["obstacle"]` so Zoomies contact can detect and destroy it.
+- `projectile.gd`: passes through harmlessly (`_return_to_pool()`, no hit) during `is_invincible()` (Zoomies).
+- `rival_base.gd`: `CAUGHT` state wired up. While `STUNNED`, `_update_chomp_window()` opens a `chomp_window_s` (1.5s) the instant the player is in Zoomies; closing to within `CHOMP_RADIUS_PX` triggers `_on_chomped()` (gold flash, `player.on_chomp_landed()`, then after `CAUGHT_RESPAWN_DELAY_S` teleports back out ahead of the player and resumes `CHASING`). Letting the window expire is a miss → `_recover_to_chasing()` (vacuum "escapes").
+- **Two real bugs surfaced across on-device playtests, both fixed:**
+  1. After landing a catch, the vacuum froze completely in world-space during the `CAUGHT` celebration (`pass`, no movement) — same class of bug as 1.4's `STUNNED` freeze, just not yet applied to the new `CAUGHT` state. A Zoomies-boosted player (2.25x speed) blew straight through the frozen vacuum and it fell off the left of the screen before the respawn teleport ran. **Fix**: `CAUGHT` now advances each frame too — but critically using the *player's actual current speed* (`player.get_speed_px_s()` → `velocity.x`, duck-typed via a new `_player_speed_px_s()` helper on `rival_base.gd`), not a flat constant, since the player could be Zoomies-boosted at exactly this moment. `_chase()`'s cruise baseline was switched to the same helper for the same reason (a plain-chasing rival needs to track the player's real speed to stay at `rival_target_distance`, whatever speed the player happens to be going).
+  2. **Important deliberate exception**: `STUNNED` was *not* switched to the player's current speed — it intentionally still uses flat `tuning.run_speed` (never Zoomies-boosted), because the whole point of `STUNNED` is to be catchable: if it matched a Zoomies-boosted player's speed exactly, the gap could never close and a Chomp would become impossible. The speed gap between a slow, flat-paced `STUNNED` vacuum and a fast `Zoomies` player is exactly what makes catching it work.
+- The gold catch-flash (`_on_chomped()`'s `visual.modulate = Color(1.0, 0.85, 0.2)`) is easy to miss in practice — small `ColorRect`, brief, and largely overlapped by the player's own visual at catch range. Not flagged as a blocker (placeholder-art phase), but worth a note for the Phase 2 art/juice pass: the catch needs a much louder cue (bigger flash, particles, camera shake, SFX) to read as a satisfying payoff on its own, not just via the respawn-teleport + label text.
+- **User confirmed via `AskUserQuestion`**: the full loop (treats → meter fills → Zoomies → catching the stunned vacuum → CHOMP → respawns ahead) "feels like a payoff worth chasing" — satisfies the intent of the project plan's 1.5 description (no single "Test:" line exists for 1.5 in the plan, unlike 1.1-1.4).
+
 ---
 
 ## 3. What's next (in order)
 
-1. **Immediate next action:** start **Milestone 1.5 — Treats, Zoomie meter, Chomp** (TDD, project plan):
-   - Treat pickups (pooled, per TDD §6-style pattern) feeding the Zoomie meter (`meter_max`, `treat_meter_value`); deflect-hits already feed the meter too (`deflect_hit_meter_value`, wired since 1.3/1.4).
-   - Zoomies burst: `zoomie_duration_s`, `zoomie_speed_mult`, tap-steering via `zoomie_nudge_impulse` (input controller already emits `zoomie_nudge_requested`, unused until now).
-   - CHOMP: preconditions are zoomies active AND rival `STUNNED`; wires up the `CAUGHT` state left reserved-but-unimplemented in `rival_base.gd` since 1.4 — `chomp_window_s` is the steer-and-line-up window (project plan: "~1.5s window to line up → CHOMP").
-   - Hit: dust-bag-burst placeholder reaction, treat payout, rival respawns further ahead (reuse the same "snap to ideal chase distance" pattern already used for the post-stun recovery in `rival_base.gd`). Miss: rival just recovers to CHASING, no punishment beyond the lost opportunity (GDD §6).
-   - Test question (project plan, §1.5): does landing a CHOMP feel like a payoff worth chasing?
-2. Continue Phase 1 ("The Ugly Capsule" prototype) milestone by milestone, exactly as sequenced in `bark_and_chomp_project_plan.md` §PHASE 1:
+1. **Immediate next action:** start **Milestone 1.6 — The Critical Test** (project plan §1.6):
+   - Play the full sequence end-to-end: throw → hop → mid-air charge → perfect release → deflect → vacuum ragdolls → treats explode → Zoomies → chomp.
+   - Give it to 3–5 people. Watch them play. Say nothing (no coaching/hinting — that's the point of this gate).
+   - This is the **GO/NO-GO gate**: only proceed to Phase 2 (art/sound vertical slice) if the ugly prototype is instinctively fun. Do not skip this gate, and do not substitute your own single-playtest judgment for the "3-5 people, silent observation" protocol the plan specifies.
+   - Worth deciding with the user first: who are the 3-5 testers, and how session feedback gets captured (notes, recording, etc.) — this is a different testing shape than the solo on-device confirms used for 1.1-1.5.
+2. Phase 1 ("The Ugly Capsule" prototype) status, per `bark_and_chomp_project_plan.md` §PHASE 1:
    - [x] 1.1 Movement — confirmed working on-device (see §2 debugging journey above).
    - [x] 1.2 Bark input state machine — confirmed working on-device (see §2 above): squash cue on charge, BLAST/WHIMPER debug label, zero accidental whimpers on intended hops.
    - [x] 1.3 Projectile + deflect — confirmed working on-device (see §2 above): deflect feels crisp and instantaneous.
    - [x] 1.4 Placeholder vacuum AI — confirmed working on-device (see §2 above): feels like an active nuisance, not a goalpost.
-   - [ ] 1.5 Treats, Zoomie meter, Chomp — next up, see above.
-   - [ ] 1.6 The Critical Test — full sequence playtest with 3–5 people, silent observation.
-3. **GO/NO-GO gate at end of Phase 1.6**: only proceed to Phase 2 (art/sound vertical slice) if the ugly prototype is instinctively fun. Do not skip this gate.
+   - [x] 1.5 Treats, Zoomie meter, Chomp — confirmed working on-device (see §2 above): full loop feels like a payoff worth chasing.
+   - [ ] 1.6 The Critical Test — next up, see above.
 
 **Reusable dev tooling now in place** (built during 1.1, applies to all future milestones):
 - Full build→deploy→test loop: `Godot_..._console.exe --headless --path "." --export-debug "Android" "builds/android/bark_and_chomp.apk"` → `adb install -r <apk>` → `adb shell am force-stop com.barkandchomp.game` → `adb shell monkey -p com.barkandchomp.game -c android.intent.category.LAUNCHER 1`.

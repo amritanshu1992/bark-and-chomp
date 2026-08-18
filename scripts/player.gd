@@ -87,6 +87,14 @@ func _ready() -> void:
 func get_track_y(progress: float) -> float:
 	return BASELINE_Y - (progress - distance_traveled)
 
+## World Y of the bottom edge of the viewport, given the camera's fixed
+## world-anchor offset (see CAMERA_Y_OFFSET_PX). A dodged/resolved entity
+## should keep scrolling down past the player instead of vanishing right at
+## the player's line -- this is the threshold past which it's actually
+## offscreen and safe to hide/free.
+func get_offscreen_bottom_y() -> float:
+	return BASELINE_Y - CAMERA_Y_OFFSET_PX + get_viewport_rect().size.y / 2.0
+
 func _physics_process(delta: float) -> void:
 	_run_time_elapsed += delta
 	var ramp_ratio := clampf(_run_time_elapsed / tuning.run_speed_ramp_s, 0.0, 1.0)

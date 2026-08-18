@@ -14,6 +14,9 @@ extends Area2D
 signal returned_to_pool(treat: Area2D)
 
 const LANE_X := 360.0
+## Extra px past the viewport's bottom edge before a dodged treat is pooled
+## -- makes sure the whole sprite has cleared frame, not just its center.
+const OFFSCREEN_MARGIN_PX := 40.0
 
 var _progress: float = 0.0
 var _player: Node2D
@@ -33,7 +36,15 @@ func _physics_process(_delta: float) -> void:
 	if not visible:
 		return
 	global_position.y = _player.get_track_y(_progress)
-	if _resolved or _player.distance_traveled < _progress:
+	if _resolved:
+		# Collected treats already popped back to the pool immediately below.
+		# A dodged treat keeps sliding -- only pool it once it's fully
+		# scrolled off the bottom of the screen, instead of vanishing right
+		# at the player's line.
+		if global_position.y > _player.get_offscreen_bottom_y() + OFFSCREEN_MARGIN_PX:
+			_return_to_pool()
+		return
+	if _player.distance_traveled < _progress:
 		return
 	_resolved = true
 	var cleared: bool = _player.has_method("is_hop_clearing") and _player.is_hop_clearing()
@@ -41,7 +52,8 @@ func _physics_process(_delta: float) -> void:
 	if cleared:
 		if _player.has_method("on_treat_dodged"):
 			_player.on_treat_dodged()
-	elif _player.has_method("on_treat_collected"):
+		return
+	if _player.has_method("on_treat_collected"):
 		_player.on_treat_collected()
 	_return_to_pool()
 

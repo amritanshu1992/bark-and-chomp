@@ -30,7 +30,7 @@ extends Resource
 @export var deflect_hit_meter_value := 20.0  # deflects feed meter (stun/meter sync fix)
 
 # Rival
-@export var rival_target_distance := 8.5     # bumped from plan's 6.0 -- playtest found throws too close/fast to react to
+@export var rival_target_distance := 11.0    # bumped from 8.5 -- playtest wanted more room between dog and vacuum
 @export var rival_distance_variation := 0.75  # +/-0.5-1.0
 @export var rival_rubber_band_k := 2.0        # chase correction strength
 @export var rival_max_adjust := 3.0           # u/s clamp on rubber-band correction

@@ -17,6 +17,11 @@ signal returned_to_pool(projectile: Area2D)
 
 const MAX_LIFETIME_S := 5.0
 const LANE_X := 360.0
+## Deflect return speed must beat the rival's max forward pace (current run
+## speed + its rubber-band adjust cap) or a deflected projectile can never
+## catch a rival that's chasing at a ramped-up run speed -- 320px/s clears
+## the rubber-band cap (tuning.rival_max_adjust=3u/s=192px/s) with margin.
+const DEFLECT_RETURN_MARGIN_PX_S := 320.0
 
 var _progress: float = 0.0
 var _progress_velocity: float = 0.0
@@ -55,10 +60,15 @@ func _on_area_entered(area: Area2D) -> void:
 		if deflected:
 			return
 		deflected = true
-		_progress_velocity = absf(_progress_velocity) * 1.15
+		var return_px_s: float = absf(_progress_velocity) * 1.15
+		if _player and _player.has_method("get_speed_px_s"):
+			return_px_s = maxf(return_px_s, _player.get_speed_px_s() + DEFLECT_RETURN_MARGIN_PX_S)
+		_progress_velocity = return_px_s
 		visual.modulate = Color(1.0, 0.5, 0.0)
+		print_debug("Projectile deflected: return_px_s=%.1f" % return_px_s)
 	elif area.is_in_group("rival"):
 		if deflected and area.has_method("on_deflect_hit"):
+			print_debug("Deflected projectile caught the rival")
 			area.on_deflect_hit()
 			_return_to_pool()
 

@@ -21,7 +21,7 @@ Read in this order:
 
 ## Status
 
-Phase 1 ("The Ugly Capsule" prototype), Milestones 1.1–1.5 confirmed working on-device. Next up: Milestone 1.6 (The Critical Test) — the GO/NO-GO gate before Phase 2. See [`handoff.md`](handoff.md) for the up-to-date checklist — it's kept current every session.
+Phase 1 ("The Ugly Capsule" prototype). Milestones 1.1–1.5 confirmed working on-device. Milestone 1.6 (The Critical Test, the GO/NO-GO gate before Phase 2) is mid-flight: several rounds of on-device playtest/fix iteration on bark-deflect timing and discoverability, plus a since-completed **vertical-orientation migration** (the game is now a portrait, single-lane, auto-climbing runner — dog fixed near the bottom, vacuum/obstacles/treats scroll toward it — a deliberate divergence from the original horizontal-runner plan) and a "Subway Surfers"-style feel pass (snappier hop, camera reframe, speed ramp, scroll cue). See [`handoff.md`](handoff.md) for the full session-by-session history and current checklist — it's kept current every session.
 
 ---
 

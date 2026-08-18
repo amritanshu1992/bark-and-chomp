@@ -21,6 +21,14 @@ Chase → dodge/deflect → collect treats → fill Zoomie meter → Zoomies →
 
 ---
 
+## Current status (updated 2026-08-19 — read `handoff.md` for the full history)
+
+Milestones 1.1–1.5 are confirmed working on-device. Milestone 1.6 (below) is mid-flight, five rounds deep in on-device playtest/fix iteration on bark-deflect timing and discoverability — not yet a clean GO/NO-GO pass.
+
+**Known divergence from this plan:** partway through Milestone 1.6 playtesting, the game was converted from the originally-built horizontal auto-runner to a **vertical, single-lane, auto-climbing runner** (dog fixed near the bottom of a portrait screen; vacuum, obstacles, treats, and projectiles all scroll top-to-bottom toward it) at the user's explicit direction. This was scoped and executed as its own architectural change outside this plan's milestone structure. It also forced a redesign of hop-vs-obstacle/treat collision from real Area2D physics overlap (found to be essentially unlandable against a fast-scrolling target) to a deterministic "resolve once, at the moment of crossing" check. None of the mechanics, controls, or milestone test questions below changed in substance — only the spatial layout and the collision-resolution method did. Full narrative in `handoff.md` §2c.
+
+---
+
 ## PHASE 0 — Setup (2–3 days)
 
 - Install Godot 4.x, Android SDK, configure export templates.

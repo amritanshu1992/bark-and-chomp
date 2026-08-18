@@ -10,67 +10,72 @@ Purpose: the build spec. Written to be dropped into the repo (alongside the GDD)
 
 - **Godot 4.x, GDScript 2.0.** (Agents: do not emit Godot 3 syntax — `onready` → `@onready`, `export` → `@export`, `yield` → `await`, signals use `signal_name.emit()` / `.connect(callable)`.)
 - Renderer: Mobile. Target 60 FPS.
-- Orientation: portrait. Base resolution 720×1280, stretch mode `canvas_items`, aspect `expand`.
+- Orientation: portrait. Base resolution 720×1280, stretch mode `canvas_items`, aspect `expand`. Confirmed working end-to-end on-device as of the vertical-orientation migration (see §5).
 - Physics tick: 60. All gameplay-critical motion in `_physics_process`.
 - Input: touch only in production; mouse-emulates-touch ON for editor testing. **All timing thresholds must be tuned against a physical device**, not the editor.
 - Android export configured in Phase 0; keystore + export template verified before any gameplay code.
+- **Gotcha:** `project.godot`'s `window/handheld/orientation` must be the bare enum index (e.g. `1` for portrait), never a quoted string like `"portrait"`. Godot's Android export code does `int(get_project_setting(...))` on that value, and casting a non-numeric string silently yields `0` (Landscape) — this shipped a landscape APK from a portrait project for a while before being caught on-device.
 
 ---
 
 ## 2. Project Structure
 
+**As actually built through Phase 1 / Milestone 1.6** (not all of the originally-planned structure exists yet — items marked "not yet built" below are still correct future scope, just not present today):
+
 ```
 res://
   scenes/
-    main.tscn            # Game scene: world, player, rival, spawners, HUD
-    player.tscn          # CharacterBody2D + sprite + collision + bark hitbox (Area2D)
-    rival_vacuum.tscn    # CharacterBody2D (inherits rival_base behavior)
-    projectile.tscn      # Area2D or RigidBody2D (pooled)
-    treat.tscn           # Area2D (pooled)
-    obstacle.tscn        # StaticBody2D
-    hud.tscn             # Meter, distance, treat count, debug state label
-    ui/                  # title, death/revive, shop (Phase 3), pause, settings
+    main.tscn            # Game scene: world, player, rival, treat spawner
+    player.tscn          # CharacterBody2D (fixed-position container, not a physics
+                          # slider) + Visual/Shadow ColorRects + BarkHitbox (Area2D)
+                          # + UI CanvasLayer
+    rival.tscn            # Area2D running rival_base.gd directly (no separate skin yet)
+    projectile.tscn       # Area2D (pooled)
+    treat.tscn            # Area2D (pooled)
+    obstacle.tscn         # Area2D (pooled progress-crossing check, not StaticBody2D — see §5)
   scripts/
     player.gd
     input_controller.gd  # The tap/hold state machine — isolated & unit-testable
-    rival_base.gd        # Template AI (chase/throw/stun/react) — skins extend this
-    rival_vacuum.gd
+    rival_base.gd        # Template AI (chase/throw/stun/react/caught)
     projectile.gd
     treat.gd
-    spawner.gd           # Obstacles + treats, difficulty-ramp-aware
-    game_manager.gd      # Autoload: run state, score, meter, zoomies, revive
-    economy.gd           # Autoload (Phase 3): wallet, costumes, prices
-    save.gd              # Autoload: local save (user://save.json)
-    difficulty.gd        # Ramp curves (speed, throw frequency vs. distance)
-    audio_manager.gd     # Autoload: pooled SFX players
+    treat_spawner.gd     # Interval spawner for treats only
+    obstacle.gd           # Single fixed-progress instance in main.tscn — no spawner yet
+    lane_scroll.gd        # Recycling scroll-cue stripes (placeholder ground-texture stand-in)
+    main.gd                # Restart button -> reload_current_scene()
+    tuning.gd
   resources/
-    tuning.tres          # ALL gameplay numbers as a custom Resource (see §3)
-    costumes/            # Phase 3: costume resource defs
-  assets/               # sprites, audio (placeholders in Phase 1)
+    tuning.tres           # Overrides live on top of tuning.gd's defaults -- check both
+  assets/                # sprites, audio (placeholders in Phase 1)
 ```
 
-Autoload singletons: `GameManager`, `Save`, `AudioManager` (+ `Economy` from Phase 3).
+**Not yet built** (still correct future scope per the phases below, not an oversight): `rival_vacuum.tscn`/`.gd` skin split, `hud.tscn`/`ui/` scenes, `spawner.gd` for obstacles, `game_manager.gd`, `economy.gd`, `save.gd`, `difficulty.gd`, `audio_manager.gd`, and any autoload singleton at all. Meter, zoomies, hit-flash, and debug-label state currently all live directly on `player.gd`, and `rival_base.gd` reaches `player.gd` via duck-typed `has_method(...)` checks rather than through a shared manager — a deliberate Phase-1 simplification (§13's "build milestone-by-milestone" instruction). `GameManager` is real Phase 3 scope (§8, §10).
 
 ---
 
 ## 3. Tuning Resource (single source of truth)
 
-Every gameplay number lives in one `@export`-ed custom Resource so it can be tweaked live and A/B'd without touching code. Initial values (from GDD; feel > numbers):
+Every gameplay number lives in one `@export`-ed custom Resource so it can be tweaked live and A/B'd without touching code. **As actually built** (`scripts/tuning.gd`) — script defaults below; `resources/tuning.tres` overrides a handful on top (noted inline), so always check both when reasoning about live feel:
 
 ```gdscript
 class_name Tuning extends Resource
 # Movement
-@export var run_speed := 6.0            # 5–7 u/s
-@export var gravity := 28.0             # 25–30 u/s^2
-@export var hop_impulse := 9.0          # 8–10 u/s
+@export var run_speed := 6.0            # start speed, u/s
+@export var run_speed_max := 10.0       # ramp target, u/s
+@export var run_speed_ramp_s := 45.0    # real seconds to reach run_speed_max
+@export var gravity := 28.0             # OVERRIDDEN to 80.0 in tuning.tres — snappier feel
+@export var hop_impulse := 9.0          # OVERRIDDEN to 20.0 in tuning.tres
 # Input
 @export var bark_threshold_ms := 150    # tap vs hold boundary — LOAD-BEARING
 @export var bark_full_charge_ms := 400
-@export var bark_cooldown_s := 0.85     # 0.7–1.0
+@export var bark_cooldown_s := 0.85
 @export var bark_range_units := 2.5     # 2–3 dog lengths
+@export var bark_hitbox_duration_s := 1.0  # widened from an original 0.3 across several
+                                            # 1.6-playtest rounds — see handoff.md §2b
+@export var projectile_speed := 8.0
 # Zoomies
 @export var zoomie_duration_s := 4.0
-@export var zoomie_speed_mult := 2.25   # 2–2.5x
+@export var zoomie_speed_mult := 2.25
 @export var zoomie_nudge_impulse := 4.0 # tap steering during zoomies
 @export var chomp_window_s := 1.5
 # Meter
@@ -78,16 +83,20 @@ class_name Tuning extends Resource
 @export var treat_meter_value := 8.0
 @export var deflect_hit_meter_value := 20.0  # deflects feed meter (stun/meter sync fix)
 # Rival
-@export var rival_target_distance := 6.0
-@export var rival_distance_variation := 0.75  # ±0.5–1.0
+@export var rival_target_distance := 11.0   # raised from an original 6.0 — playtest wanted
+                                             # more room/reaction time
+@export var rival_distance_variation := 0.75
+@export var rival_rubber_band_k := 2.0
+@export var rival_max_adjust := 3.0
 @export var throw_interval_min_s := 3.0
 @export var throw_interval_max_s := 4.0
-@export var stun_duration_s := 2.5      # tune upward if chomps too rare
-# Economy (Phase 3)
+@export var throw_telegraph_s := 0.65
+@export var stun_duration_s := 2.5
+# Economy (Phase 3 — not yet consumed by any built system)
 @export var revive_cost_treats := 50
 ```
 
-Unit convention: 1 unit = 64 px at base resolution (adjust in prototype if it feels wrong; keep ONE conversion constant).
+Unit convention: 1 unit = 64 px (`PX_PER_UNIT` in `player.gd`) at base resolution.
 
 ---
 
@@ -127,23 +136,28 @@ ZOOMIES MODE (flag set by GameManager)
 
 ## 5. Player (`player.gd`, CharacterBody2D)
 
-Movement states: `RUNNING → HOPPING → FALLING` (+ `ZOOMIES` as a modifier flag, not a separate movement system; + `DEAD`).
+**As actually built, this is a vertical-orientation architecture, not the horizontal auto-runner originally specced above §1–4.** Partway through Milestone 1.6 playtesting the game was converted to a portrait, single-lane, auto-climbing runner at the user's direction (full narrative: `handoff.md` §2c). The player node does not physically traverse the world at all:
 
-- `_physics_process`: constant `run_speed` (× zoomie multiplier when active) on X; gravity on Y; `move_and_slide()`.
-- `hop_requested` → if on floor: `velocity.y = -hop_impulse` (units→px). No double jump in MVP.
-- `bark_released(full=true)` → enable forward bark hitbox (Area2D, `bark_range_units` long) for a few frames; play blast VFX/SFX; start cooldown. `full=false` → whimper puff VFX/SFX only.
-- Zoomies: invincible flag, speed multiplier, obstacle-destroy on contact, `zoomie_nudge_requested` → small upward impulse (steering).
-- Contact with projectile/obstacle when not invincible → `GameManager.on_player_hit()`.
+- The player is pinned at a fixed screen position, `(FIXED_X=360.0, BASELINE_Y=1000.0)` minus a local `hop_offset` — no `move_and_slide()`, no `is_on_floor()`, no literal floor body. `distance_traveled` is the single "how far into the run" clock, advanced every `_physics_process` by the current scroll speed.
+- Every other entity (rival, projectile, treat, obstacle) is stationary in its own fixed `progress`/`target_progress` coordinate and renders each frame via `player.get_track_y(progress) -> float: return BASELINE_Y - (progress - distance_traveled)` — so visually, the world scrolls top-to-bottom toward the dog rather than the dog running through the world.
+- Hop physics: `hop_requested` sets `hop_velocity = tuning.hop_impulse * PX_PER_UNIT` if grounded (`hop_offset <= 0 and hop_velocity == 0`); each tick applies gravity to `hop_velocity` then integrates into `hop_offset`, clamped at 0 on landing. Gravity is asymmetric — `HOP_RISE_GRAVITY_MULT=0.8` while rising, `HOP_FALL_GRAVITY_MULT=1.6` while falling — a deliberate feel fix (floats a beat longer near the apex, drops fast at the bottom) over an earlier symmetric-parabola version that read as an abrupt "snap."
+- Hop-vs-obstacle/treat clearance is **not** real Area2D shape-overlap physics. `is_hop_clearing() -> bool: return hop_offset > HOP_CLEARANCE_MIN_PX` (20px) is checked once, by the obstacle/treat itself, at the exact physics frame `distance_traveled` crosses its fixed progress value — see §6/§9 and `handoff.md` §2c for why real overlap testing was abandoned (essentially unlandable against a fast-scrolling target).
+- Camera2D and the Shadow ColorRect are both children of the player and cancel the parent's `hop_offset`-driven Y movement in local space (`local_position.y = hop_offset - CAMERA_Y_OFFSET_PX` / `= hop_offset`), so the camera stays pinned at a fixed world Y and the shadow stays pinned at ground level while only the Visual sprite appears to rise — plus a lift-scale (`HOP_VISUAL_LIFT_SCALE`) and shadow fade as a pseudo-3D cue.
+- `bark_released(full=true)` → enable forward bark hitbox (Area2D, `bark_range_units` long) for `bark_hitbox_duration_s`; play blast VFX/SFX; start cooldown. `full=false` → whimper puff VFX/SFX only.
+- Zoomies: invincible flag (`is_invincible()`), speed multiplier, obstacle-destroy on contact (`queue_free()` on an obstacle it crosses while invincible), `zoomie_nudge_requested` → small hop-style impulse (steering).
+- Contact with projectile/obstacle when not invincible → placeholder feedback only (`on_projectile_hit()` / `on_obstacle_hit()`, a red flash + debug label). **No death/consequence mechanic exists yet** — that's real `GameManager` scope (§8), deliberately deferred past Milestone 1.6.
 
 ---
 
 ## 6. Projectile (`projectile.gd`, pooled)
 
-- Spawned by rival: velocity toward the dog (negative X), slight arc allowed for readability.
-- On overlap with active bark hitbox → **deflect**: `velocity.x *= -1` (plus small speed bonus for crispness), retag `deflected = true`, flip sprite.
-- Deflected projectile overlapping rival → `rival.on_deflect_hit()` + `GameManager.add_meter(deflect_hit_meter_value)`.
-- Hitting the player (not deflected, player not invincible) → player hit.
-- Off-screen → return to pool. Pool everything: projectiles, treats, particles (mobile GC hygiene).
+Uses the same fixed-`_progress` + `get_track_y()` render pattern as every other entity (§5) rather than literal X/Y velocity — the rival throws it at a `_progress` ahead of the dog, and it moves by advancing `_progress` (via `_progress_velocity`) each tick, same as `distance_traveled` does for the player.
+
+- Spawned by rival: `_progress` starts at the rival's position, `_progress_velocity` set toward the dog at `tuning.projectile_speed`.
+- On overlap with active bark hitbox → **deflect**: reverses `_progress_velocity` and retargets it to `max(original_return_speed, player.get_speed_px_s() + DEFLECT_RETURN_MARGIN_PX_S)` where `DEFLECT_RETURN_MARGIN_PX_S := 320.0`. This margin fix was load-bearing: a flat return speed let the rival's chase speed (which ramps with the run) outrun and permanently evade an already-deflected projectile for most of a run — see `handoff.md` §2c for the full bug writeup.
+- Deflected projectile crossing the rival's progress → `rival.on_deflect_hit()` + `player.add_meter(tuning.deflect_hit_meter_value)`.
+- Hitting the player (progress crosses the player's line, not deflected, player not invincible) → `player.on_projectile_hit()` (placeholder flash, no consequence yet).
+- Past the player and off the bottom of the screen → return to pool. Pool everything: projectiles, treats (obstacles are a single non-pooled instance, §9).
 
 ---
 
@@ -162,12 +176,16 @@ REACT     # brief interrupt layer for non-stun hits: flatten/spin/knockback
 ```
 
 ### 7.2 Chase math (per physics tick)
+
+**As actually built**, this is progress-space, not X-space (§5's vertical-orientation architecture) — the rival holds a lead in `distance_traveled` units, not a literal screen-X gap:
 ```
-desired_x = player.x + target_distance + noise(t)     # noise: ±distance_variation, slow sine/perlin
-error     = desired_x - self.x
-velocity.x = player_run_speed + clamp(error * k, -max_adjust, +max_adjust)
+desired_progress = player.distance_traveled + rival_target_distance * PX_PER_UNIT + noise(t)
+error             = desired_progress - self._progress
+progress_velocity = player.get_speed_px_s() + clamp(error * rival_rubber_band_k, -rival_max_adjust * PX_PER_UNIT, +rival_max_adjust * PX_PER_UNIT)
 ```
-Never hard-lock position — the rubber-band constant `k` and `max_adjust` are tuned so the vacuum feels alive, drifting within ±0.5–1.0 units.
+`rival_target_distance` is currently tuned to 11.0 units (raised from an original 6.0 — playtest wanted more room/reaction time). Never hard-locked — `rival_rubber_band_k` and `rival_max_adjust` are tuned so the vacuum feels alive, drifting within `rival_distance_variation` (±0.75 units) of the target.
+
+All five states below (CHASING/THROWING/STUNNED/CAUGHT/REACT) are implemented in `rival_base.gd` and confirmed working on-device as of Milestone 1.5.
 
 ### 7.3 Throwing
 - Timer: uniform random in `[throw_interval_min_s, throw_interval_max_s]`, re-rolled each throw (anti-memorization).
@@ -183,6 +201,8 @@ Never hard-lock position — the rubber-band constant `k` and `max_adjust` are t
 
 ## 8. GameManager (autoload)
 
+**Not yet built — real Phase 3 scope, consistent with §2's file-tree note.** There is no autoload of any kind in the project today. Everything this section describes (meter, zoomies, hit-flash, run lifecycle) currently lives directly on `player.gd` as plain methods (`add_meter()`, `on_treat_collected()`, `on_projectile_hit()`, etc.), and `rival_base.gd` reaches the player through duck-typed `has_method(...)` checks rather than a shared manager — a deliberate Phase-1 simplification per §13. The design below is the intended future shape once run lifecycle (death, revive, results) becomes real.
+
 Owns run state, never scene-specific logic.
 
 - Run lifecycle: `READY → RUNNING → (HIT → REVIVE_OFFER → RUNNING | GAME_OVER) → RESULTS`.
@@ -196,9 +216,13 @@ Owns run state, never scene-specific logic.
 
 ## 9. Spawning & World
 
-- Endless world via ground segments recycled ahead of the camera; parallax layers (2–3) in vertical slice.
-- `spawner.gd`: obstacle + treat placement ahead of player; guarantees fairness (min gap after obstacles ≥ hop reach; no obstacle inside a throw's unavoidable path). Treat lines/arcs placed to teach hop trajectories.
-- Camera: follows player X with slight lead; Y fixed or gently smoothed.
+**As actually built** (not the originally-planned endless-world spawner below, which is still correct future scope — see the gaps noted per item):
+
+- **Obstacle:** a single fixed-`target_progress` instance placed in `main.tscn` (`obstacle.gd`, `target_progress = 1500.0`) — Phase-1 scope matches the pre-migration game, which also only ever had one placed instance. No `spawner.gd`, no pooling, no fairness/spacing logic yet.
+- **Treats:** `treat_spawner.gd`, a plain interval spawner (`POOL_SIZE=6`, `SPAWN_INTERVAL_S=1.5`, spawns 500px ahead of the player each interval) — enough to exercise meter-fill → Zoomies → Chomp, not the difficulty-ramp-aware placement/hop-teaching arcs described in the original plan.
+- **Visual scroll cue:** `lane_scroll.gd` — a small fixed ring of recycling stripe bars rendered via the same `get_track_y()`/`distance_traveled` clock every other entity uses, standing in for a real ground texture/parallax layer (placeholder art, Phase 1).
+- **Camera:** a child of the player (§5), pinned to a fixed world-Y anchor (`CAMERA_Y_OFFSET_PX`) that cancels the player's own hop bob — not a follow-camera, since the player never moves in world space; the world scrolls to it instead.
+- **Not yet built:** real endless-world recycling for obstacles, fairness guarantees (min gap ≥ hop reach, no obstacle inside an unavoidable throw path), parallax layers, and any obstacle spawner at all.
 
 ---
 

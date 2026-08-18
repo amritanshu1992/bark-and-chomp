@@ -11,7 +11,7 @@ A chaotic little shih tzu chases a sentient vacuum cleaner that stole its treats
 **One-line pitch:** "A tiny chaotic shih tzu is trying to get its stolen treats back from a sentient vacuum, and you control its hops and perfectly timed bark attacks."
 
 **Genre:** Casual endless runner with timing-based combat
-**Platform:** Android (mobile-first, portrait/landscape TBD in prototype — recommend landscape)
+**Platform:** Android (mobile-first, **portrait**, single vertical lane — confirmed during Phase 1; the dog stays fixed near the bottom of the screen while the vacuum, obstacles, treats, and projectiles scroll top-to-bottom toward it, rather than the dog auto-running left-to-right. See Technical Design Doc §1/§5 and `handoff.md` §2c for the full "vertical-orientation migration" story — this was a mid-Phase-1 divergence from the original horizontal-runner assumption baked into this doc's earlier drafts.)
 **Session length:** 60–120 second runs
 **Audience:** Casual mobile players; short-form-video audiences (TikTok/Reels/Shorts)
 **Business model:** Rewarded ads (primary) + treat IAP + remove-ads (see §10)
@@ -100,9 +100,9 @@ One thumb. Two verbs. All thresholds are exported variables tuned on a physical 
 ## 6. Player Systems
 
 ### 6.1 Movement (initial tuning values — feel > numbers)
-- Auto-run horizontal speed: 5–7 u/s
-- Gravity: 25–30 u/s²
-- Hop impulse: 8–10 u/s; hop duration ~0.55–0.70 s
+- Auto-scroll speed: starts 5–7 u/s, ramps up to 10 u/s over the first 45s of a run (added during the "Subway Surfers" feel pass — most of a 60–120s run plays at or near max speed). The dog itself is fixed in place; this speed is how fast the world (vacuum, obstacles, treats, projectiles) scrolls toward it, not literal horizontal travel — see §1 platform note.
+- Gravity / hop impulse: current on-device tuning (`resources/tuning.tres`) is snappier than the original 25–30 u/s² / 8–10 u/s range — `gravity=80`, `hop_impulse=20`, hang time ~0.5s — chosen deliberately for a punchier feel once the game became a vertical scroller. Treat the original range as the starting point, not the current value; check `tuning.tres` for what's actually live.
+- Hop-vs-obstacle/treat resolution is **not** real physics overlap — it's a deterministic check at the exact moment the obstacle/treat reaches the dog's line, gated on whether the dog is airborne past a minimum height at that instant. On-device testing found genuine shape-overlap physics essentially unlandable against a fast-scrolling target. See TDD §5/§6 and `handoff.md` §2c.
 - Feel target: slightly ridiculous and floaty, never mushy. 60 FPS.
 
 ### 6.2 Zoomie Meter & Zoomies
@@ -127,8 +127,8 @@ One thumb. Two verbs. All thresholds are exported variables tuned on a physical 
 ## 7. Rival Systems (Vacuum AI)
 
 ### 7.1 Chase behavior
-- Maintains ~6 units ahead with soft rubber-banding: too close → accelerates away; too far → slows.
-- ±0.5–1.0 unit organic variation. **Never hard-locked at +6** — the chase must feel alive.
+- Maintains a target lead distance ahead of the dog (currently tuned to 11 units, up from the original ~6 — playtesting wanted more room/reaction time between the dog and the vacuum) with soft rubber-banding: too close → accelerates away; too far → slows. Check `tuning.rival_target_distance` for the live value.
+- ±0.5–1.0 unit organic variation (`rival_distance_variation`). **Never hard-locked at the target distance** — the chase must feel alive.
 
 ### 7.2 Attack behavior
 - Throws a household object backward toward the dog every 3–4 s, with timing jitter so rhythm can't be memorized.

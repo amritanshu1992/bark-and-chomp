@@ -1,4 +1,4 @@
-[gd_scene load_steps=6 format=3]
+[gd_scene load_steps=5 format=3]
 
 [ext_resource type="PackedScene" path="res://scenes/player.tscn" id="1"]
 [ext_resource type="PackedScene" path="res://scenes/obstacle.tscn" id="2"]
@@ -6,34 +6,17 @@
 [ext_resource type="PackedScene" path="res://scenes/rival.tscn" id="4"]
 [ext_resource type="Script" path="res://scripts/treat_spawner.gd" id="5"]
 
-[sub_resource type="RectangleShape2D" id="RectangleShape2D_1"]
-size = Vector2(20000, 200)
-
 [node name="Main" type="Node2D"]
 script = ExtResource("3")
 
-[node name="Ground" type="StaticBody2D" parent="."]
-position = Vector2(9900, 700)
-
-[node name="CollisionShape2D" type="CollisionShape2D" parent="Ground"]
-shape = SubResource("RectangleShape2D_1")
-
-[node name="Visual" type="ColorRect" parent="Ground"]
-offset_left = -10000.0
-offset_top = -100.0
-offset_right = 10000.0
-offset_bottom = 100.0
-mouse_filter = 2
-color = Color(0.3, 0.5, 0.2, 1)
-
 [node name="Player" parent="." instance=ExtResource("1")]
-position = Vector2(200, 500)
+position = Vector2(360, 1000)
 
 [node name="Obstacle" parent="." instance=ExtResource("2")]
-position = Vector2(900, 552)
+position = Vector2(360, 1000)
 
 [node name="Rival" parent="." instance=ExtResource("4")]
-position = Vector2(744, 500)
+position = Vector2(360, 1000)
 
 [node name="TreatSpawner" type="Node" parent="."]
 script = ExtResource("5")

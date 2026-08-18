@@ -51,6 +51,9 @@ func _on_area_entered(area: Area2D) -> void:
 func _on_body_entered(body: Node2D) -> void:
 	if deflected:
 		return
+	for area in get_overlapping_areas():
+		if area.is_in_group("bark_hitbox"):
+			return  # point-blank overlap in the same frame -- let _on_area_entered win the race
 	if body.has_method("is_invincible") and body.is_invincible():
 		_return_to_pool()
 		return

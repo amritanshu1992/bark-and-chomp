@@ -34,6 +34,7 @@ var _stun_timer_s: float = 0.0
 var _chomp_window_s: float = -1.0
 var _time: float = 0.0
 var _pool: Array[Area2D] = []
+var _first_throw_done: bool = false
 
 func _ready() -> void:
 	for i in POOL_SIZE:
@@ -91,6 +92,10 @@ func _reroll_throw_timer() -> void:
 	_throw_timer_s = randf_range(tuning.throw_interval_min_s, tuning.throw_interval_max_s)
 
 func _start_throw() -> void:
+	if not _first_throw_done:
+		_first_throw_done = true
+		if player.has_method("maybe_show_bark_hint"):
+			await player.maybe_show_bark_hint()
 	_state = State.THROWING
 	visual.modulate = Color(1.0, 0.2, 0.1)  # loud wind-up cue -- attacks are never cheap
 	visual.scale = Vector2(1.4, 1.4)

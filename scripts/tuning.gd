@@ -11,7 +11,7 @@ extends Resource
 @export var bark_full_charge_ms := 400
 @export var bark_cooldown_s := 0.85     # 0.7-1.0
 @export var bark_range_units := 2.5     # 2-3 dog lengths
-@export var bark_hitbox_duration_s := 0.15  # "a few frames" per TDD Sec4.2
+@export var bark_hitbox_duration_s := 1.0   # fixed-length deflect window starting at full-charge commit (not release, and not extended by continued holding) -- widened from an original 0.15s post-release-only window ("a few frames" per TDD Sec4.2); 1.6 playtest found that window too tight to land even when the player understood the mechanic, and a naive "stay live for as long as held" version made holding a free-invulnerability strategy. Widened again 0.3->1.0: 0.3s only covered the ~0.18s the projectile spends inside bark_range, but total time from the rival's red telegraph flash to actual contact is ~1.26s (0.65s telegraph + ~0.61s flight, at projectile_speed+run_speed=14u/s closing speed) -- reacting to the red flash instantly (as the in-game hint tells the player to) reached full charge at only 400ms, leaving the old 0.3s window closed ~550ms before the projectile ever arrived. 1.0s covers that full gap with margin across the rival's distance-noise range.
 
 # Projectile
 @export var projectile_speed := 8.0     # u/s, toward player

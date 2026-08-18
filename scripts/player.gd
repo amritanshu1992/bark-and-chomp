@@ -9,6 +9,8 @@ extends CharacterBody2D
 const PX_PER_UNIT := 64.0
 const CHARGE_SCALE := Vector2(1.3, 0.65)
 const LABEL_FLASH_S := 0.4
+const BARK_HINT_S := 2.5
+const BARK_HINT_TEXT := "Watch the vacuum!\nThe instant it turns RED,\nHOLD to bark it back!"
 const ZOOMIE_COLOR := Color(1.0, 0.4, 0.8)
 const METER_BAR_MAX_WIDTH := 260.0
 
@@ -18,16 +20,21 @@ const METER_BAR_MAX_WIDTH := 260.0
 @onready var visual: ColorRect = $Visual
 @onready var debug_label: Label = $UI/DebugLabel
 @onready var meter_bar_fill: ColorRect = $UI/MeterBarFill
+@onready var hint_label: Label = $UI/HintLabel
 @onready var bark_hitbox: Area2D = $BarkHitbox
 @onready var bark_hitbox_shape: CollisionShape2D = $BarkHitbox/CollisionShape2D
 
 var meter: float = 0.0
 var zoomies_active: bool = false
+var _flash_id: int = 0
+var _bark_hitbox_token: int = 0
+var _has_charged_ever: bool = false
 var _zoomies_time_left: float = 0.0
 
 func _ready() -> void:
 	input_controller.hop_requested.connect(_on_hop_requested)
 	input_controller.charge_started.connect(_on_charge_started)
+	input_controller.bark_ready.connect(_on_bark_ready)
 	input_controller.bark_released.connect(_on_bark_released)
 	input_controller.zoomie_nudge_requested.connect(_on_zoomie_nudge_requested)
 
@@ -68,19 +75,44 @@ func _on_zoomie_nudge_requested() -> void:
 func _on_charge_started() -> void:
 	visual.scale = CHARGE_SCALE
 	debug_label.text = "CHARGING"
+	_has_charged_ever = true
+
+## Called by the rival on its first-ever throw telegraph -- 1.6 silent-observation
+## playtest found hold-to-bark is not discoverable unprompted, so this is a minimal
+## in-fiction nudge (not the full FTUE tutorial, which is deliberately Phase 3 scope
+## per the project plan Sec3.4). Only fires if the player has never held at all.
+## Pauses the whole game world for the duration -- reading the hint shouldn't cost
+## run distance or leave the player exposed to the throw it's explaining. The rival
+## awaits this before starting its telegraph, so the full throw runway begins fresh
+## after unpausing.
+func maybe_show_bark_hint() -> void:
+	if _has_charged_ever:
+		return
+	get_tree().paused = true
+	hint_label.text = BARK_HINT_TEXT
+	await get_tree().create_timer(BARK_HINT_S).timeout
+	hint_label.text = ""
+	get_tree().paused = false
+
+func _on_bark_ready() -> void:
+	## Deflect hitbox goes live for a fixed window starting the instant a hold reaches
+	## full charge -- point-blank contact is covered without requiring release-instant
+	## precision, but the window does NOT extend for as long as the player keeps
+	## holding, so holding indefinitely is not free invulnerability: the skill is
+	## timing *when you commit* to full charge, not just when you release.
+	bark_hitbox.monitorable = true
+	_bark_hitbox_token += 1
+	var my_token := _bark_hitbox_token
+	await get_tree().create_timer(tuning.bark_hitbox_duration_s).timeout
+	if _bark_hitbox_token == my_token:
+		bark_hitbox.monitorable = false
 
 func _on_bark_released(full: bool) -> void:
 	visual.scale = Vector2.ONE
 	if full:
 		_flash(Color(1.0, 0.6, 0.1), "BLAST")
-		_activate_bark_hitbox()
 	else:
 		_flash(Color(0.75, 0.75, 0.75), "WHIMPER")
-
-func _activate_bark_hitbox() -> void:
-	bark_hitbox.monitorable = true
-	await get_tree().create_timer(tuning.bark_hitbox_duration_s).timeout
-	bark_hitbox.monitorable = false
 
 func add_meter(amount: float) -> void:
 	if zoomies_active:
@@ -133,14 +165,13 @@ func _update_meter_bar() -> void:
 
 func _flash(color: Color, text: String) -> void:
 	visual.modulate = color
-	debug_label.text = text
-	await get_tree().create_timer(LABEL_FLASH_S).timeout
-	if debug_label.text == text:
-		debug_label.text = ""
-		visual.modulate = ZOOMIE_COLOR if zoomies_active else Color.WHITE
+	_flash_label(text)
 
 func _flash_label(text: String) -> void:
 	debug_label.text = text
+	_flash_id += 1
+	var my_id := _flash_id
 	await get_tree().create_timer(LABEL_FLASH_S).timeout
-	if debug_label.text == text:
+	if _flash_id == my_id:
 		debug_label.text = "ZOOMIES!" if zoomies_active else ""
+		visual.modulate = ZOOMIE_COLOR if zoomies_active else Color.WHITE

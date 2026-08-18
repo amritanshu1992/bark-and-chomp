@@ -1,6 +1,6 @@
 # Handoff — "Bark & Chomp"
 
-Last updated: 2026-08-19 (session 7 cont'd — Subway-Surfers feel pass)
+Last updated: 2026-08-19 (session 7 cont'd — 3D hop-cue fix)
 
 Purpose: read this first at the start of a new session to pick up exactly where things left off. It is a living doc — update it at the end of each session.
 
@@ -200,7 +200,8 @@ User report: *"when i hold when it vaccum turns red it does not bounce back — 
   - Speed ramp: new `run_speed_max` (10.0) / `run_speed_ramp_s` (45.0 real seconds) in `tuning.gd` — `run_speed` now lerps up over the first 45s of a run instead of staying flat. Checked against the hard-won bark-deflect timing (`bark_hitbox_duration_s=1.0`, tuned across Round 3/5 of the 1.6 playtest saga above): max-ramped speed only shortens red-flash-to-contact time (1.26s→1.12s), which gives the existing 0.4-1.4s deflect window *more* margin, not less — no re-tuning needed.
   - Visual scroll cue: new `scripts/lane_scroll.gd` — a small fixed ring of recycling stripe bars rendered via the same `get_track_y()`/`distance_traveled` clock every other entity uses, since placeholder art has no ground texture.
   - Verified via headless smoke test (exit 0, zero errors — hit and fixed the same `:=`-over-duck-typed-call inference bug as `treat.gd`/`rival_base.gd` earlier in this branch), rebuilt, redeployed to the test device.
-  - **Next step**: user to confirm the new feel on-device.
+  - **User confirmed**: hop/camera/speed/scroll all feel good.
+  - **3D hop-cue fix, deployed, pending re-confirmation.** User reported "3d effect dose not work" (the pseudo-3D sprite lift-scale + shrinking/fading shadow cue from `398796e`). Root cause: not a logic bug — `hop_ratio`/`_max_hop_offset_px` math is correct — but the snappier hop tuning halved hang time (old gravity=28/impulse=12 → ~0.86s hang; new gravity=80/impulse=20 → ~0.5s hang) while apex height stayed ~the same. The cue tracks the raw parabola, which only grazes peak ratio for an instant, so at half the hang time it read as barely-there. Fix in `scripts/player.gd`: bumped `HOP_VISUAL_LIFT_SCALE` 1.18 → 1.32, and changed the shadow/scale ratio from the raw linear `hop_offset / _max_hop_offset_px` to a sqrt-eased version (`sqrt(raw_ratio)`) so the cue reaches near-peak intensity quickly and holds it, instead of only touching the top for a frame. Smoke-tested clean, built, installed, launched on device. **Not yet confirmed by user on-device.**
 - **Not yet done**: merging `vertical-orientation` back to `main`. This branch is still open pending the user's re-confirmation of the hop-clearance fix and this feel pass, and the final whole-branch review step of the SDD workflow (dispatch final code reviewer, address findings, then `superpowers:finishing-a-development-branch`).
 
 ---

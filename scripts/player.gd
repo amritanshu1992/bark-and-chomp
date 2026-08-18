@@ -20,7 +20,7 @@ const BASELINE_Y := 1000.0
 ## visible runway above for the rival/obstacles/treats to be seen coming.
 const CAMERA_Y_OFFSET_PX := 230.0
 const CHARGE_SCALE := Vector2(1.3, 0.65)
-const HOP_VISUAL_LIFT_SCALE := 1.18
+const HOP_VISUAL_LIFT_SCALE := 1.32
 const HOP_SHADOW_MIN_SCALE := 0.4
 const HOP_SHADOW_MIN_ALPHA := 0.15
 const HOP_SHADOW_MAX_ALPHA := 0.4
@@ -105,7 +105,12 @@ func _physics_process(delta: float) -> void:
 	# rather than just sliding up the screen. Shadow counters the parent's
 	# hop bob the same way the camera does, so it stays pinned at ground
 	# level while the sprite rises off it.
-	var hop_ratio := clampf(hop_offset / _max_hop_offset_px, 0.0, 1.0)
+	# sqrt-eased so the cue reaches near-peak intensity quickly and holds it,
+	# instead of tracking the raw parabola (which only grazes the top for an
+	# instant) -- needed to keep the cue readable now that the snappier hop
+	# halved hang time versus the original tuning this was designed against.
+	var raw_hop_ratio := clampf(hop_offset / _max_hop_offset_px, 0.0, 1.0)
+	var hop_ratio := sqrt(raw_hop_ratio)
 	shadow.position = Vector2(0.0, hop_offset)
 	shadow.scale = Vector2.ONE * lerpf(1.0, HOP_SHADOW_MIN_SCALE, hop_ratio)
 	shadow.modulate.a = lerpf(HOP_SHADOW_MAX_ALPHA, HOP_SHADOW_MIN_ALPHA, hop_ratio)

@@ -9,10 +9,15 @@ extends Area2D
 ## the instant the player is in Zoomies; overlap within that window is a CHOMP
 ## (big payout, respawn ahead), letting the window expire is a miss (early
 ## recovery, "vacuum recovers and escapes" per the GDD).
+## Vertical-orientation migration: this rival no longer tracks its own state
+## via global_position.x. It tracks an explicit _progress float (same role
+## global_position.x used to play) and renders each frame via
+## player.get_track_y(_progress), staying pinned to the single lane's X.
 
 enum State { CHASING, THROWING, STUNNED, REACT, CAUGHT }
 
 const PX_PER_UNIT := 64.0
+const LANE_X := 360.0
 const POOL_SIZE := 4
 const REACT_DURATION_S := 0.3
 const KNOCKBACK_PX := 40.0
@@ -27,6 +32,7 @@ const NOISE_FREQUENCY := 0.4  # slow sine drift; not a called-out tunable in the
 @onready var player: Node2D = get_node("../Player")
 @onready var visual: ColorRect = $Visual
 
+var _progress: float = 0.0
 var _state: State = State.CHASING
 var _throw_timer_s: float = 0.0
 var _react_timer_s: float = 0.0
@@ -37,6 +43,8 @@ var _pool: Array[Area2D] = []
 var _first_throw_done: bool = false
 
 func _ready() -> void:
+	_progress = player.distance_traveled + tuning.rival_target_distance * PX_PER_UNIT
+	_render()
 	for i in POOL_SIZE:
 		var p: Area2D = projectile_scene.instantiate()
 		add_child(p)
@@ -61,18 +69,23 @@ func _physics_process(delta: float) -> void:
 		State.STUNNED:
 			# No active herding while stunned -- just keep pace with the player's BASE
 			# (non-Zoomies) speed, deliberately, so it "slows"/holds its relative spot
-			# instead of literally freezing in world-space, while still being slower than
+			# instead of literally freezing in place, while still being slower than
 			# a Zoomies-boosted player -- that speed gap is what makes catching it possible.
-			global_position.x += tuning.run_speed * PX_PER_UNIT * delta
+			_progress += tuning.run_speed * PX_PER_UNIT * delta
+			_render()
 			_stun_timer_s -= delta
 			_update_chomp_window(delta)
 			if _state == State.STUNNED and _stun_timer_s <= 0.0:
 				_recover_to_chasing()
 		State.CAUGHT:
 			# Same fix as STUNNED: keep pace with the player's current speed during the
-			# catch celebration instead of freezing in world-space, or a Zoomies-boosted
-			# player carries it off the left of the screen before the respawn below runs.
-			global_position.x += _player_speed_px_s() * delta
+			# catch celebration instead of freezing in place, or a Zoomies-boosted
+			# player would leave it stranded far behind before the respawn below runs.
+			_progress += _player_speed_px_s() * delta
+			_render()
+
+func _render() -> void:
+	global_position = Vector2(LANE_X, player.get_track_y(_progress))
 
 func _player_speed_px_s() -> float:
 	if player.has_method("get_speed_px_s"):
@@ -80,13 +93,14 @@ func _player_speed_px_s() -> float:
 	return tuning.run_speed * PX_PER_UNIT
 
 func _chase(delta: float) -> void:
-	var desired_x := player.global_position.x + tuning.rival_target_distance * PX_PER_UNIT \
+	var desired: float = player.distance_traveled + tuning.rival_target_distance * PX_PER_UNIT \
 		+ sin(_time * NOISE_FREQUENCY) * tuning.rival_distance_variation * PX_PER_UNIT
-	var error := desired_x - global_position.x
+	var error: float = desired - _progress
 	var max_adjust_px := tuning.rival_max_adjust * PX_PER_UNIT
 	var adjust := clampf(error * tuning.rival_rubber_band_k, -max_adjust_px, max_adjust_px)
-	var vel_x := _player_speed_px_s() + adjust
-	global_position.x += vel_x * delta
+	var vel := _player_speed_px_s() + adjust
+	_progress += vel * delta
+	_render()
 
 func _reroll_throw_timer() -> void:
 	_throw_timer_s = randf_range(tuning.throw_interval_min_s, tuning.throw_interval_max_s)
@@ -112,7 +126,7 @@ func _throw_projectile() -> void:
 	if _pool.is_empty():
 		return
 	var p: Area2D = _pool.pop_back()
-	p.launch(global_position, tuning.projectile_speed * PX_PER_UNIT)
+	p.launch(_progress, tuning.projectile_speed * PX_PER_UNIT, player)
 
 func _on_projectile_returned(p: Area2D) -> void:
 	_pool.append(p)
@@ -122,7 +136,8 @@ func on_deflect_hit() -> void:
 		return
 	_state = State.REACT
 	_react_timer_s = REACT_DURATION_S
-	global_position.x += KNOCKBACK_PX
+	_progress += KNOCKBACK_PX
+	_render()
 	visual.scale = Vector2.ONE
 	visual.modulate = Color(1.0, 0.3, 0.3)
 	if player.has_method("add_meter"):
@@ -151,9 +166,10 @@ func _update_chomp_window(delta: float) -> void:
 func _recover_to_chasing() -> void:
 	visual.modulate = Color.WHITE
 	# Escape animation stand-in: the vacuum was frozen in place for react+stun while
-	# the player kept auto-running, so a plain rubber-band correction would leave it
+	# the player kept advancing, so a plain rubber-band correction would leave it
 	# crawling back into frame for several seconds. Snap back into range instead.
-	global_position.x = player.global_position.x + tuning.rival_target_distance * PX_PER_UNIT
+	_progress = player.distance_traveled + tuning.rival_target_distance * PX_PER_UNIT
+	_render()
 	_chomp_window_s = -1.0
 	_state = State.CHASING
 
@@ -163,7 +179,8 @@ func _on_chomped() -> void:
 	if player.has_method("on_chomp_landed"):
 		player.on_chomp_landed()
 	await get_tree().create_timer(CAUGHT_RESPAWN_DELAY_S).timeout
-	global_position.x = player.global_position.x + tuning.rival_target_distance * PX_PER_UNIT + RESPAWN_MARGIN_PX
+	_progress = player.distance_traveled + tuning.rival_target_distance * PX_PER_UNIT + RESPAWN_MARGIN_PX
+	_render()
 	visual.modulate = Color.WHITE
 	_reroll_throw_timer()
 	_state = State.CHASING

@@ -16,6 +16,10 @@ const PX_PER_UNIT := 64.0
 const FIXED_X := 360.0
 const BASELINE_Y := 1000.0
 const CHARGE_SCALE := Vector2(1.3, 0.65)
+const HOP_VISUAL_LIFT_SCALE := 1.18
+const HOP_SHADOW_MIN_SCALE := 0.4
+const HOP_SHADOW_MIN_ALPHA := 0.15
+const HOP_SHADOW_MAX_ALPHA := 0.4
 const LABEL_FLASH_S := 0.4
 const BARK_HINT_S := 2.5
 const BARK_HINT_TEXT := "Watch the vacuum!\nThe instant it turns RED,\nHOLD to bark it back!"
@@ -26,6 +30,7 @@ const METER_BAR_MAX_WIDTH := 260.0
 
 @onready var input_controller: Node = $InputController
 @onready var visual: ColorRect = $Visual
+@onready var shadow: ColorRect = $Shadow
 @onready var camera: Camera2D = $Camera2D
 @onready var debug_label: Label = $UI/DebugLabel
 @onready var meter_bar_fill: ColorRect = $UI/MeterBarFill
@@ -43,6 +48,8 @@ var _flash_id: int = 0
 var _bark_hitbox_token: int = 0
 var _has_charged_ever: bool = false
 var _zoomies_time_left: float = 0.0
+var _is_charging: bool = false
+var _max_hop_offset_px: float = 1.0
 
 func _ready() -> void:
 	input_controller.hop_requested.connect(_on_hop_requested)
@@ -57,6 +64,9 @@ func _ready() -> void:
 	bark_hitbox_shape.position = Vector2(0.0, -shape.size.y / 2.0)
 
 	global_position = Vector2(FIXED_X, BASELINE_Y)
+	# Apex height of a full hop (v^2 / 2g), used to normalize the lift-scale/
+	# shadow-shrink cue below so it reads correctly across tuning changes.
+	_max_hop_offset_px = (tuning.hop_impulse * tuning.hop_impulse) / (2.0 * tuning.gravity) * PX_PER_UNIT
 
 ## Returns the screen Y an entity at the given progress should render at
 ## right now. progress > distance_traveled = still ahead (ie. "up the
@@ -81,6 +91,18 @@ func _physics_process(delta: float) -> void:
 	# space so the camera's global Y always stays pinned at BASELINE_Y.
 	camera.position = Vector2(0.0, hop_offset)
 
+	# Pseudo-3D hop cue: the sprite scales up and the shadow shrinks/fades
+	# as hop height increases, so a hop reads as lifting toward the camera
+	# rather than just sliding up the screen. Shadow counters the parent's
+	# hop bob the same way the camera does, so it stays pinned at ground
+	# level while the sprite rises off it.
+	var hop_ratio := clampf(hop_offset / _max_hop_offset_px, 0.0, 1.0)
+	shadow.position = Vector2(0.0, hop_offset)
+	shadow.scale = Vector2.ONE * lerpf(1.0, HOP_SHADOW_MIN_SCALE, hop_ratio)
+	shadow.modulate.a = lerpf(HOP_SHADOW_MAX_ALPHA, HOP_SHADOW_MIN_ALPHA, hop_ratio)
+	if not _is_charging:
+		visual.scale = Vector2.ONE * lerpf(1.0, HOP_VISUAL_LIFT_SCALE, hop_ratio)
+
 	if zoomies_active:
 		_zoomies_time_left -= delta
 		if _zoomies_time_left <= 0.0:
@@ -96,6 +118,7 @@ func _on_zoomie_nudge_requested() -> void:
 	_flash_label("NUDGE")
 
 func _on_charge_started() -> void:
+	_is_charging = true
 	visual.scale = CHARGE_SCALE
 	debug_label.text = "CHARGING"
 	_has_charged_ever = true
@@ -131,6 +154,7 @@ func _on_bark_ready() -> void:
 		bark_hitbox.monitorable = false
 
 func _on_bark_released(full: bool) -> void:
+	_is_charging = false
 	visual.scale = Vector2.ONE
 	if full:
 		_flash(Color(1.0, 0.6, 0.1), "BLAST")

@@ -33,7 +33,7 @@ func _spawn() -> void:
 	if _pool.is_empty():
 		return
 	var t: Area2D = _pool.pop_back()
-	t.activate(Vector2(player.global_position.x + SPAWN_AHEAD_PX, player.global_position.y))
+	t.activate(player.distance_traveled + SPAWN_AHEAD_PX, player)
 
 func _on_returned_to_pool(t: Area2D) -> void:
 	_pool.append(t)

@@ -2,7 +2,9 @@ class_name Tuning
 extends Resource
 
 # Movement
-@export var run_speed := 6.0            # 5-7 u/s
+@export var run_speed := 6.0            # 5-7 u/s -- starting speed, ramps toward run_speed_max below
+@export var run_speed_max := 10.0       # Subway-Surfers-style feel pass: speed builds over a run instead of staying flat
+@export var run_speed_ramp_s := 45.0    # real seconds from run_speed to run_speed_max (runs are 60-120s, so most of a run is at/near max)
 @export var gravity := 28.0             # 25-30 u/s^2
 @export var hop_impulse := 9.0          # 8-10 u/s
 

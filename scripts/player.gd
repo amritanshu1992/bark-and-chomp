@@ -15,6 +15,10 @@ extends CharacterBody2D
 const PX_PER_UNIT := 64.0
 const FIXED_X := 360.0
 const BASELINE_Y := 1000.0
+## Subway-Surfers-style feel pass: pulls the camera's world-anchor point up
+## so the player renders lower in frame (not dead center), leaving more
+## visible runway above for the rival/obstacles/treats to be seen coming.
+const CAMERA_Y_OFFSET_PX := 230.0
 const CHARGE_SCALE := Vector2(1.3, 0.65)
 const HOP_VISUAL_LIFT_SCALE := 1.18
 const HOP_SHADOW_MIN_SCALE := 0.4
@@ -50,6 +54,7 @@ var _has_charged_ever: bool = false
 var _zoomies_time_left: float = 0.0
 var _is_charging: bool = false
 var _max_hop_offset_px: float = 1.0
+var _run_time_elapsed: float = 0.0
 
 func _ready() -> void:
 	input_controller.hop_requested.connect(_on_hop_requested)
@@ -75,8 +80,11 @@ func get_track_y(progress: float) -> float:
 	return BASELINE_Y - (progress - distance_traveled)
 
 func _physics_process(delta: float) -> void:
+	_run_time_elapsed += delta
+	var ramp_ratio := clampf(_run_time_elapsed / tuning.run_speed_ramp_s, 0.0, 1.0)
+	var base_speed_u_s := lerpf(tuning.run_speed, tuning.run_speed_max, ramp_ratio)
 	var speed_mult := tuning.zoomie_speed_mult if zoomies_active else 1.0
-	_current_speed_px_s = tuning.run_speed * PX_PER_UNIT * speed_mult
+	_current_speed_px_s = base_speed_u_s * PX_PER_UNIT * speed_mult
 	distance_traveled += _current_speed_px_s * delta
 
 	if hop_offset > 0.0 or hop_velocity != 0.0:
@@ -88,8 +96,9 @@ func _physics_process(delta: float) -> void:
 
 	global_position = Vector2(FIXED_X, BASELINE_Y - hop_offset)
 	# Camera is a child of Player -- cancel the parent's hop bob in local
-	# space so the camera's global Y always stays pinned at BASELINE_Y.
-	camera.position = Vector2(0.0, hop_offset)
+	# space so the camera's global Y always stays pinned at
+	# BASELINE_Y - CAMERA_Y_OFFSET_PX (see const comment above).
+	camera.position = Vector2(0.0, hop_offset - CAMERA_Y_OFFSET_PX)
 
 	# Pseudo-3D hop cue: the sprite scales up and the shadow shrinks/fades
 	# as hop height increases, so a hop reads as lifting toward the camera

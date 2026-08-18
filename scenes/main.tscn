@@ -5,9 +5,13 @@
 [ext_resource type="Script" path="res://scripts/main.gd" id="3"]
 [ext_resource type="PackedScene" path="res://scenes/rival.tscn" id="4"]
 [ext_resource type="Script" path="res://scripts/treat_spawner.gd" id="5"]
+[ext_resource type="Script" path="res://scripts/lane_scroll.gd" id="6"]
 
 [node name="Main" type="Node2D"]
 script = ExtResource("3")
+
+[node name="LaneScroll" type="Node2D" parent="."]
+script = ExtResource("6")
 
 [node name="Player" parent="." instance=ExtResource("1")]
 position = Vector2(360, 1000)

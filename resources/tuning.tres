@@ -4,4 +4,5 @@
 
 [resource]
 script = ExtResource("1")
-hop_impulse = 12.0
+gravity = 80.0
+hop_impulse = 20.0

@@ -5,8 +5,12 @@ extends Resource
 @export var run_speed := 6.0            # 5-7 u/s -- starting speed, ramps toward run_speed_max below
 @export var run_speed_max := 10.0       # Subway-Surfers-style feel pass: speed builds over a run instead of staying flat
 @export var run_speed_ramp_s := 45.0    # real seconds from run_speed to run_speed_max (runs are 60-120s, so most of a run is at/near max)
-@export var gravity := 28.0             # 25-30 u/s^2
-@export var hop_impulse := 9.0          # 8-10 u/s
+@export var gravity := 28.0             # 25-30 u/s^2 -- these are just this script's
+                                         # defaults; resources/tuning.tres is authoritative
+                                         # and currently overrides this to 80.0 (snappier
+                                         # Subway-Surfers-style hop feel pass)
+@export var hop_impulse := 9.0          # 8-10 u/s -- see gravity note above;
+                                         # resources/tuning.tres overrides this to 20.0
 
 # Input
 @export var bark_threshold_ms := 150    # tap vs hold boundary - LOAD-BEARING

@@ -215,6 +215,12 @@ func _start_zoomies() -> void:
 	input_controller.zoomies_active = true
 	visual.modulate = ZOOMIE_COLOR
 	debug_label.text = "ZOOMIES!"
+	# input_controller's touch handler short-circuits (no bark_released signal)
+	# once zoomies_active is true, so a charge started right before Zoomies
+	# triggers (eg. from a treat collected mid-hold) would otherwise leave
+	# _is_charging stuck true for the rest of the run, freezing the hop
+	# lift-scale cue and priming a spurious BLAST on the next tap.
+	_is_charging = false
 
 func _end_zoomies() -> void:
 	zoomies_active = false
@@ -235,9 +241,10 @@ func is_invincible() -> bool:
 ## fast-scrolling ground object toward the same on-screen line, exact
 ## capsule-vs-box overlap only clears with near-frame-perfect timing, which
 ## on-device testing showed doesn't work at all in practice. This threshold
-## is deliberately low relative to hop apex (~164px at default tuning) so
-## most of a hop's ~0.86s hang time counts as "clearing" -- the skill is
-## roughly timing the hop, not micro-timing an overlap window.
+## is deliberately low relative to hop apex (~200px at current tuning,
+## measured peak ~189px) so most of a hop's ~0.53s hang time counts as
+## "clearing" -- the skill is roughly timing the hop, not micro-timing an
+## overlap window.
 const HOP_CLEARANCE_MIN_PX := 20.0
 
 func is_hop_clearing() -> bool:

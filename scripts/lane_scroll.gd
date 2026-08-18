@@ -9,7 +9,7 @@ extends Node2D
 ## treat, since there's no gameplay logic attached, just a fixed count of
 ## flat rects reused forever.
 
-const STRIPE_COUNT := 8
+const STRIPE_COUNT := 12
 const STRIPE_SPACING_PX := 160.0
 const STRIPE_HEIGHT := 16.0
 const RECYCLE_SPAN_PX := STRIPE_COUNT * STRIPE_SPACING_PX
@@ -31,7 +31,12 @@ func _ready() -> void:
 		_progresses.append(_player.distance_traveled + i * STRIPE_SPACING_PX)
 
 func _physics_process(_delta: float) -> void:
-	var recycle_y := get_viewport_rect().size.y + STRIPE_HEIGHT
+	# Must be a world-Y (camera-anchor-derived), not a raw viewport size --
+	# get_track_y() output is world-space, and comparing it against a plain
+	# viewport length only coincided by accident, leaving the top ~36% of the
+	# lane unstriped on the actual portrait test device. get_offscreen_bottom_y()
+	# is the same camera-anchored helper treat.gd already uses correctly.
+	var recycle_y: float = _player.get_offscreen_bottom_y() + STRIPE_HEIGHT
 	for i in _stripes.size():
 		var y: float = _player.get_track_y(_progresses[i])
 		if y > recycle_y:

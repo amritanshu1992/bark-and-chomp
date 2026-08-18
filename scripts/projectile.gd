@@ -8,10 +8,13 @@ extends Area2D
 ## position; _progress_velocity plays the same role velocity_x used to
 ## (negative = closing on the player, flipped positive on deflect = heading
 ## back toward the rival). Rendered each frame via player.get_track_y().
-## Hop-height clearance needs no extra code here -- it's genuine Area2D shape
-## overlap: a well-timed hop lifts the player's shape clear of this one's at
-## the moment their rendered Y positions coincide, so a miss from an arriving
-## projectile falls out of physics the same way a miss on a static obstacle does.
+## Hopping does NOT clear a projectile -- tested directly during final branch
+## review. A hop moves the player's capsule up, toward a descending
+## projectile, so a well-timed hop makes contact happen earlier, not later;
+## there is no hop timing that avoids a hit here. The only way to avoid a
+## projectile is barking it away (see _on_area_entered's bark_hitbox branch
+## below) before it arrives -- unlike obstacle.gd/treat.gd, which resolve via
+## progress-crossing + is_hop_clearing() and genuinely are hop-dodgeable.
 
 signal returned_to_pool(projectile: Area2D)
 
@@ -36,6 +39,7 @@ func _ready() -> void:
 	area_entered.connect(_on_area_entered)
 	set_physics_process(false)
 	visible = false
+	monitoring = false
 
 func launch(from_progress: float, speed_px_s: float, player_ref: Node2D) -> void:
 	_player = player_ref
@@ -46,6 +50,7 @@ func launch(from_progress: float, speed_px_s: float, player_ref: Node2D) -> void
 	global_position = Vector2(LANE_X, _player.get_track_y(_progress))
 	visual.modulate = Color.WHITE
 	visible = true
+	monitoring = true
 	set_physics_process(true)
 
 func _physics_process(delta: float) -> void:
@@ -60,6 +65,11 @@ func _on_area_entered(area: Area2D) -> void:
 		if deflected:
 			return
 		deflected = true
+		# Reset the lifetime clock on deflect -- during Zoomies the closing
+		# speed (and so the worst-case return margin) is much higher, and
+		# without this a perfectly-timed deflect could hit MAX_LIFETIME_S
+		# and silently despawn before ever reaching the rival.
+		_age = 0.0
 		var return_px_s: float = absf(_progress_velocity) * 1.15
 		if _player and _player.has_method("get_speed_px_s"):
 			return_px_s = maxf(return_px_s, _player.get_speed_px_s() + DEFLECT_RETURN_MARGIN_PX_S)
@@ -86,6 +96,9 @@ func _on_body_entered(body: Node2D) -> void:
 	_return_to_pool()
 
 func _return_to_pool() -> void:
+	if not visible:
+		return
 	set_physics_process(false)
+	set_deferred("monitoring", false)
 	visible = false
 	returned_to_pool.emit(self)

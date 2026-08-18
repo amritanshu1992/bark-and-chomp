@@ -32,7 +32,7 @@ res://
     rival.tscn            # Area2D running rival_base.gd directly (no separate skin yet)
     projectile.tscn       # Area2D (pooled)
     treat.tscn            # Area2D (pooled)
-    obstacle.tscn         # Area2D (pooled progress-crossing check, not StaticBody2D — see §5)
+    obstacle.tscn         # Area2D (single non-pooled instance, progress-crossing check, not StaticBody2D — see §5, §9)
   scripts/
     player.gd
     input_controller.gd  # The tap/hold state machine — isolated & unit-testable
@@ -143,7 +143,7 @@ ZOOMIES MODE (flag set by GameManager)
 - Hop physics: `hop_requested` sets `hop_velocity = tuning.hop_impulse * PX_PER_UNIT` if grounded (`hop_offset <= 0 and hop_velocity == 0`); each tick applies gravity to `hop_velocity` then integrates into `hop_offset`, clamped at 0 on landing. Gravity is asymmetric — `HOP_RISE_GRAVITY_MULT=0.8` while rising, `HOP_FALL_GRAVITY_MULT=1.6` while falling — a deliberate feel fix (floats a beat longer near the apex, drops fast at the bottom) over an earlier symmetric-parabola version that read as an abrupt "snap."
 - Hop-vs-obstacle/treat clearance is **not** real Area2D shape-overlap physics. `is_hop_clearing() -> bool: return hop_offset > HOP_CLEARANCE_MIN_PX` (20px) is checked once, by the obstacle/treat itself, at the exact physics frame `distance_traveled` crosses its fixed progress value — see §6/§9 and `handoff.md` §2c for why real overlap testing was abandoned (essentially unlandable against a fast-scrolling target).
 - Camera2D and the Shadow ColorRect are both children of the player and cancel the parent's `hop_offset`-driven Y movement in local space (`local_position.y = hop_offset - CAMERA_Y_OFFSET_PX` / `= hop_offset`), so the camera stays pinned at a fixed world Y and the shadow stays pinned at ground level while only the Visual sprite appears to rise — plus a lift-scale (`HOP_VISUAL_LIFT_SCALE`) and shadow fade as a pseudo-3D cue.
-- `bark_released(full=true)` → enable forward bark hitbox (Area2D, `bark_range_units` long) for `bark_hitbox_duration_s`; play blast VFX/SFX; start cooldown. `full=false` → whimper puff VFX/SFX only.
+- The forward bark hitbox (Area2D, `bark_range_units` long) goes live at full-charge **commit** (`_on_bark_ready()`, fired the instant a hold crosses `bark_full_charge_ms` while still held) for a fixed `bark_hitbox_duration_s` window, not on release — this covers the whole remaining approach including flush point-blank contact (see `tuning.gd`'s own comment on `bark_hitbox_duration_s`, and `handoff.md` §2b Round 3 for the full history). `bark_released(full=true)` only plays the BLAST VFX/SFX and starts cooldown; `full=false` → whimper puff VFX/SFX only.
 - Zoomies: invincible flag (`is_invincible()`), speed multiplier, obstacle-destroy on contact (`queue_free()` on an obstacle it crosses while invincible), `zoomie_nudge_requested` → small hop-style impulse (steering).
 - Contact with projectile/obstacle when not invincible → placeholder feedback only (`on_projectile_hit()` / `on_obstacle_hit()`, a red flash + debug label). **No death/consequence mechanic exists yet** — that's real `GameManager` scope (§8), deliberately deferred past Milestone 1.6.
 
@@ -157,7 +157,7 @@ Uses the same fixed-`_progress` + `get_track_y()` render pattern as every other 
 - On overlap with active bark hitbox → **deflect**: reverses `_progress_velocity` and retargets it to `max(original_return_speed, player.get_speed_px_s() + DEFLECT_RETURN_MARGIN_PX_S)` where `DEFLECT_RETURN_MARGIN_PX_S := 320.0`. This margin fix was load-bearing: a flat return speed let the rival's chase speed (which ramps with the run) outrun and permanently evade an already-deflected projectile for most of a run — see `handoff.md` §2c for the full bug writeup.
 - Deflected projectile crossing the rival's progress → `rival.on_deflect_hit()` + `player.add_meter(tuning.deflect_hit_meter_value)`.
 - Hitting the player (progress crosses the player's line, not deflected, player not invincible) → `player.on_projectile_hit()` (placeholder flash, no consequence yet).
-- Past the player and off the bottom of the screen → return to pool. Pool everything: projectiles, treats (obstacles are a single non-pooled instance, §9).
+- Pools on `MAX_LIFETIME_S` (5s) timeout, not on going off-screen -- unlike treats, which do use the off-screen rule (`treat.gd`'s `OFFSCREEN_MARGIN_PX` check). Pool everything: projectiles, treats (obstacles are a single non-pooled instance, §9).
 
 ---
 

@@ -32,17 +32,24 @@ func _ready() -> void:
 
 func _physics_process(_delta: float) -> void:
 	global_position.y = _player.get_track_y(target_progress)
-	if _resolved or _player.distance_traveled < target_progress:
+	if _resolved:
+		# Keep ticking (and visually sliding down/off screen) after resolution
+		# -- this obstacle is a single non-pooled instance with no spawner to
+		# recycle it, so stopping the position update right at resolution would
+		# freeze it on screen forever instead of scrolling away like every
+		# other resolved entity. Only stop ticking once it's genuinely offscreen.
+		if global_position.y > _player.get_offscreen_bottom_y():
+			set_physics_process(false)
+		return
+	if _player.distance_traveled < target_progress:
 		return
 	_resolved = true
 	if _player.has_method("is_invincible") and _player.is_invincible():
 		queue_free()
 		return
 	var cleared: bool = _player.has_method("is_hop_clearing") and _player.is_hop_clearing()
-	print_debug("Obstacle resolve: distance=%.1f target=%.1f hop_offset=%.1f cleared=%s" % [_player.distance_traveled, target_progress, _player.hop_offset, cleared])
 	if cleared:
 		if _player.has_method("on_obstacle_cleared"):
 			_player.on_obstacle_cleared()
-		return
-	if _player.has_method("on_obstacle_hit"):
+	elif _player.has_method("on_obstacle_hit"):
 		_player.on_obstacle_hit()

@@ -7,7 +7,12 @@ extends Node
 
 const POOL_SIZE := 6
 const SPAWN_INTERVAL_S := 1.5
-const SPAWN_AHEAD_PX := 500.0
+## Must clear the visible world height with margin so treats spawn off the
+## top of the screen instead of popping in mid-lane -- 500.0 was a leftover
+## horizontal-layout value (spawned ~49% down the visible screen on the
+## portrait test device). ~1560px is the tallest plausible visible world
+## height on the 19.5:9 test device.
+const SPAWN_AHEAD_PX := 1600.0
 
 @export var treat_scene: PackedScene = preload("res://scenes/treat.tscn")
 

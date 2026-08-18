@@ -10,7 +10,7 @@ Purpose: the build spec. Written to be dropped into the repo (alongside the GDD)
 
 - **Godot 4.x, GDScript 2.0.** (Agents: do not emit Godot 3 syntax — `onready` → `@onready`, `export` → `@export`, `yield` → `await`, signals use `signal_name.emit()` / `.connect(callable)`.)
 - Renderer: Mobile. Target 60 FPS.
-- Orientation: landscape. Base resolution 1280×720, stretch mode `canvas_items`, aspect `expand`.
+- Orientation: portrait. Base resolution 720×1280, stretch mode `canvas_items`, aspect `expand`.
 - Physics tick: 60. All gameplay-critical motion in `_physics_process`.
 - Input: touch only in production; mouse-emulates-touch ON for editor testing. **All timing thresholds must be tuned against a physical device**, not the editor.
 - Android export configured in Phase 0; keystore + export template verified before any gameplay code.

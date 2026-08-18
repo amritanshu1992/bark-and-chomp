@@ -5,8 +5,16 @@ extends CharacterBody2D
 ## Milestone 1.3: bark hitbox / projectile deflect.
 ## Milestone 1.5: Zoomie meter, Zoomies (speed/invincibility/obstacle-destroy),
 ## tap-nudge steering, and reacting to a landed Chomp (called by rival_base.gd).
+## Vertical-orientation migration: the player no longer physically traverses
+## the world. `distance_traveled` is the "how far into the run" clock every
+## other entity reads via get_track_y(); the player itself stays pinned at
+## (FIXED_X, BASELINE_Y) minus a local hop offset, computed manually each
+## frame instead of via move_and_slide()/is_on_floor() -- there is no literal
+## floor body to slide against any more.
 
 const PX_PER_UNIT := 64.0
+const FIXED_X := 360.0
+const BASELINE_Y := 1000.0
 const CHARGE_SCALE := Vector2(1.3, 0.65)
 const LABEL_FLASH_S := 0.4
 const BARK_HINT_S := 2.5
@@ -18,14 +26,19 @@ const METER_BAR_MAX_WIDTH := 260.0
 
 @onready var input_controller: Node = $InputController
 @onready var visual: ColorRect = $Visual
+@onready var camera: Camera2D = $Camera2D
 @onready var debug_label: Label = $UI/DebugLabel
 @onready var meter_bar_fill: ColorRect = $UI/MeterBarFill
 @onready var hint_label: Label = $UI/HintLabel
 @onready var bark_hitbox: Area2D = $BarkHitbox
 @onready var bark_hitbox_shape: CollisionShape2D = $BarkHitbox/CollisionShape2D
 
+var distance_traveled: float = 0.0
+var hop_offset: float = 0.0
+var hop_velocity: float = 0.0
 var meter: float = 0.0
 var zoomies_active: bool = false
+var _current_speed_px_s: float = 0.0
 var _flash_id: int = 0
 var _bark_hitbox_token: int = 0
 var _has_charged_ever: bool = false
@@ -39,37 +52,47 @@ func _ready() -> void:
 	input_controller.zoomie_nudge_requested.connect(_on_zoomie_nudge_requested)
 
 	var shape := RectangleShape2D.new()
-	shape.size = Vector2(tuning.bark_range_units * PX_PER_UNIT, 96.0)
+	shape.size = Vector2(96.0, tuning.bark_range_units * PX_PER_UNIT)
 	bark_hitbox_shape.shape = shape
-	bark_hitbox_shape.position = Vector2(shape.size.x / 2.0, 0.0)
+	bark_hitbox_shape.position = Vector2(0.0, -shape.size.y / 2.0)
+
+	global_position = Vector2(FIXED_X, BASELINE_Y)
+
+## Returns the screen Y an entity at the given progress should render at
+## right now. progress > distance_traveled = still ahead (ie. "up the
+## screen", smaller Y, hasn't reached the player yet).
+func get_track_y(progress: float) -> float:
+	return BASELINE_Y - (progress - distance_traveled)
 
 func _physics_process(delta: float) -> void:
 	var speed_mult := tuning.zoomie_speed_mult if zoomies_active else 1.0
-	velocity.x = tuning.run_speed * PX_PER_UNIT * speed_mult
+	_current_speed_px_s = tuning.run_speed * PX_PER_UNIT * speed_mult
+	distance_traveled += _current_speed_px_s * delta
 
-	if is_on_floor() and velocity.y >= 0.0:
-		velocity.y = 0.0
-	else:
-		velocity.y += tuning.gravity * PX_PER_UNIT * delta
+	if hop_offset > 0.0 or hop_velocity != 0.0:
+		hop_velocity -= tuning.gravity * PX_PER_UNIT * delta
+		hop_offset += hop_velocity * delta
+		if hop_offset <= 0.0:
+			hop_offset = 0.0
+			hop_velocity = 0.0
 
-	move_and_slide()
+	global_position = Vector2(FIXED_X, BASELINE_Y - hop_offset)
+	# Camera is a child of Player -- cancel the parent's hop bob in local
+	# space so the camera's global Y always stays pinned at BASELINE_Y.
+	camera.position = Vector2(0.0, hop_offset)
 
 	if zoomies_active:
 		_zoomies_time_left -= delta
 		if _zoomies_time_left <= 0.0:
 			_end_zoomies()
-		for i in get_slide_collision_count():
-			var collider := get_slide_collision(i).get_collider()
-			if collider and collider.is_in_group("obstacle"):
-				collider.queue_free()
 
 func _on_hop_requested() -> void:
-	if is_on_floor():
-		velocity.y = -tuning.hop_impulse * PX_PER_UNIT
+	if hop_offset <= 0.0 and hop_velocity == 0.0:
+		hop_velocity = tuning.hop_impulse * PX_PER_UNIT
 	_flash_label("HOP")
 
 func _on_zoomie_nudge_requested() -> void:
-	velocity.y = -tuning.zoomie_nudge_impulse * PX_PER_UNIT
+	hop_velocity = tuning.zoomie_nudge_impulse * PX_PER_UNIT
 	_flash_label("NUDGE")
 
 func _on_charge_started() -> void:
@@ -152,12 +175,19 @@ func is_invincible() -> bool:
 	return zoomies_active
 
 func get_speed_px_s() -> float:
-	return velocity.x
+	return _current_speed_px_s
 
 func on_projectile_hit() -> void:
 	## Placeholder "ouch" cue — real hit consequences (revive flow, GameManager)
 	## land in a later phase; this just makes misses visible during playtesting.
 	_flash(Color(1.0, 0.0, 0.0), "HIT")
+
+func on_obstacle_hit() -> void:
+	## Placeholder "ouch" cue, same convention as on_projectile_hit(). Obstacles
+	## used to be a literal physical blocker the player slid against; now that
+	## the player's X is fixed and nothing physically traverses the world, a
+	## miss is represented as an explicit hit consequence instead.
+	_flash(Color(1.0, 0.0, 0.0), "OUCH")
 
 func _update_meter_bar() -> void:
 	var ratio := clampf(meter / tuning.meter_max, 0.0, 1.0)

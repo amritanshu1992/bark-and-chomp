@@ -1,6 +1,6 @@
 # Handoff — "Bark & Chomp"
 
-Last updated: 2026-08-19 (session 6, round 5)
+Last updated: 2026-08-19 (session 6, round 5, vertical-orientation Task 5 complete)
 
 Purpose: read this first at the start of a new session to pick up exactly where things left off. It is a living doc — update it at the end of each session.
 
@@ -96,6 +96,30 @@ Still open, but not blocking progression to 1.2:
   2. Projectiles spawn from the rival's actual position, which per the project plan's `rival_target_distance=6.0` units is much closer than Milestone 1.3's test-spawner (`SPAWN_AHEAD_PX=700px` vs 6 units×64=384px) — noticeably less flight time/reaction room than what 1.3 was tuned and confirmed against. **Fix**: bumped `rival_target_distance` to 8.5 in `tuning.gd` (deliberate playtest-driven deviation from the plan's "~6 units" — noted here per `CLAUDE.md`'s divergence-tracking instruction). Also updated the `Rival` node's initial spawn offset in `main.tscn` to match.
   3. After a deflect-hit, the vacuum froze completely in world-space for the whole REACT+STUNNED window (~2.8s) while the player kept auto-running — so the player would catch up to and run past the stationary vacuum (read as "it comes at me"), then it would be left behind off the left edge of the camera for several seconds before a slow rubber-band catch-up brought it back. **Fix** (`rival_base.gd::_physics_process`): `STUNNED` now moves the rival forward at the player's base `run_speed` with no active herding/throwing (keeps pace instead of literally freezing — still visually reads as stunned via the grey tint, but doesn't fall behind or get run through). `on_deflect_hit()` also still snaps to the ideal chase distance the instant `STUNNED` ends, as a cheap stand-in for the "escape animation" TDD §7.4 calls for.
 - **User confirmed on real device** ("it feels much better" after fix #3, then explicit answer via `AskUserQuestion`): **yes, active nuisance, not a goalpost** — satisfies the project plan's exact 1.4 test question.
+
+**Milestone 1.5 — Treats, Zoomies, Chomp: done, confirmed on-device.**
+
+---
+
+## 2a. Vertical-orientation migration — Task 5: Obstacle progress-tracking Area2D
+
+**Status: COMPLETE (commit `ef9ea30`)**
+
+Created `scripts/obstacle.gd` as a new `Area2D`-based obstacle handler that leverages the two-accumulator architecture. The obstacle now:
+- Sits at a fixed screen X (`LANE_X := 360.0`) and renders Y position each frame via `player.get_track_y(target_progress)`
+- Has an exported `target_progress` tuning point (default 1500.0 units into the run)
+- Connects to `body_entered` signal to detect player/projectile collision
+- Duck-types `player.is_invincible()` to check for Zoomies protection (destroys self if invincible)
+- Duck-types `player.on_obstacle_hit()` to trigger hit consequences (same pattern as rival/projectile)
+
+Converted `scenes/obstacle.tscn` from `StaticBody2D` to `Area2D` with:
+- New collision layer 64 (previously unused) and mask 2 (detects player's layer 2)
+- Script reference to the new `obstacle.gd`
+- Maintained existing ColorRect visual (red 64×96 placeholder)
+
+Smoke test passed (headless run, exit 0, no script/scene errors).
+
+---
 
 **Milestone 1.5 — Treats, Zoomies, Chomp: done, confirmed on-device.**
 - `scripts/treat.gd` + `scenes/treat.tscn`: pooled `Area2D` treat pickup (same `activate()`/`returned_to_pool` pattern as `projectile.gd`), new collision layer `treat=32`, `monitoring` toggled on/off (it's the "detector" scanning for the player body, unlike the rival's always-on `monitorable`).

@@ -5,9 +5,16 @@ extends Area2D
 ## Now the player's X is fixed and nothing physically traverses the world,
 ## so this becomes an Area2D at a fixed target _progress that renders itself
 ## each frame via player.get_track_y() -- same pattern as rival/projectile/
-## treat. Real hop clearance is still genuine Godot shape-overlap physics:
-## a well-timed hop lifts the player's collision shape clear of this one's
-## at the moment their rendered Y positions coincide.
+## treat.
+##
+## Hop clearance is resolved by progress-crossing + player.is_hop_clearing(),
+## not raw Area2D shape overlap -- on-device testing showed a hop essentially
+## never wins a genuine capsule-vs-box overlap race against a fast-scrolling
+## obstacle (the player's rise and the obstacle's approach both eat into the
+## same combined-half-height margin, leaving a real but vanishingly small
+## landable window). Resolving once, at the exact moment the obstacle reaches
+## the player's line, against the player's current airborne state, is what
+## actually gives hopping real, reliable effect.
 
 const LANE_X := 360.0
 
@@ -18,16 +25,20 @@ const LANE_X := 360.0
 
 @onready var _player: Node2D = get_node("../Player")
 
+var _resolved: bool = false
+
 func _ready() -> void:
-	body_entered.connect(_on_body_entered)
 	global_position = Vector2(LANE_X, _player.get_track_y(target_progress))
 
 func _physics_process(_delta: float) -> void:
 	global_position.y = _player.get_track_y(target_progress)
-
-func _on_body_entered(body: Node2D) -> void:
-	if body.has_method("is_invincible") and body.is_invincible():
+	if _resolved or _player.distance_traveled < target_progress:
+		return
+	_resolved = true
+	if _player.has_method("is_invincible") and _player.is_invincible():
 		queue_free()
 		return
-	if body.has_method("on_obstacle_hit"):
-		body.on_obstacle_hit()
+	if _player.has_method("is_hop_clearing") and _player.is_hop_clearing():
+		return
+	if _player.has_method("on_obstacle_hit"):
+		_player.on_obstacle_hit()

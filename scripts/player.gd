@@ -198,6 +198,20 @@ func is_zoomies_active() -> bool:
 func is_invincible() -> bool:
 	return zoomies_active
 
+## Whether the player is currently airborne enough for a hop to count as
+## clearing an obstacle/treat. Deliberately not raw shape-overlap physics
+## (see obstacle.gd/treat.gd) -- with the player's rendered Y racing a
+## fast-scrolling ground object toward the same on-screen line, exact
+## capsule-vs-box overlap only clears with near-frame-perfect timing, which
+## on-device testing showed doesn't work at all in practice. This threshold
+## is deliberately low relative to hop apex (~164px at default tuning) so
+## most of a hop's ~0.86s hang time counts as "clearing" -- the skill is
+## roughly timing the hop, not micro-timing an overlap window.
+const HOP_CLEARANCE_MIN_PX := 20.0
+
+func is_hop_clearing() -> bool:
+	return hop_offset > HOP_CLEARANCE_MIN_PX
+
 func get_speed_px_s() -> float:
 	return _current_speed_px_s
 

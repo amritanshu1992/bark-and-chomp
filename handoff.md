@@ -1,6 +1,6 @@
 # Handoff — "Bark & Chomp"
 
-Last updated: 2026-08-19 (session 6, round 5)
+Last updated: 2026-08-18 (session 7 — vertical-orientation migration)
 
 Purpose: read this first at the start of a new session to pick up exactly where things left off. It is a living doc — update it at the end of each session.
 
@@ -176,6 +176,19 @@ User report: *"when i hold when it vaccum turns red it does not bounce back — 
 - **Does not reopen the Round 3 hold-forever exploit**: the fixed-window token mechanism (`_bark_hitbox_token` in `player.gd`, paired with `_full_charge_signaled` in `input_controller.gd`) grants exactly one window per hold-*cycle*, reset only on a fresh press. Widening the window's *duration* doesn't change that it's still single-shot per commit — holding longer, or across a later throw without releasing first, still buys nothing extra.
 - Verified: clean headless run (exit 0, zero errors), clean rebuild (exit 0), reinstalled and relaunched on the test device via `adb install -r` → force-stop → monkey-launch (all reported success). **Not yet re-tested by the user.**
 - **Immediate next step**: user to confirm holding the *instant* the vacuum turns red now reliably deflects. If confirmed, resume the full silent-observation playtest protocol (discoverability + full-loop fun, per Round 4's still-open question) — this was the last known mechanic-level blocker.
+
+---
+
+## 2c. Session 7 (2026-08-18) — vertical-orientation migration
+
+**Divergence from `bark_and_chomp_project_plan.md`**: the horizontal single-lane prototype described in Phase 1 was converted to a **vertical, single-lane, auto-climbing runner** (vacuum/rival above, dog/player fixed near the bottom, obstacles/treats/projectiles scroll top-to-bottom toward the player) per the user's explicit direction. This was scoped as its own architectural change, brainstormed and planned separately: `docs/superpowers/plans/2026-08-18-vertical-orientation.md`, executed via `superpowers:subagent-driven-development` in worktree `.worktrees/vertical-orientation` (branch `vertical-orientation`), Tasks 1-8. All 8 tasks completed and task-reviewed clean.
+
+- Core layout logic (`player.gd`'s `get_track_y()`, fixed `FIXED_X`/`BASELINE_Y`, and every entity's progress-based Y positioning) was correct on first implementation and matched the user's intent — the lane/positioning math was never the actual bug.
+- **Real bug found during Task 8's human-playtest step**: the exported Android APK rendered in landscape on the physical device despite the project targeting portrait. Root cause: `project.godot`'s `window/handheld/orientation` was stored as a **quoted string** (`"portrait"`), but Godot's Android export code does `int(get_project_setting(...))` on that value — a non-numeric string casts to `0`, which is the `Landscape` enum index. This bug predates the migration (the old `"landscape"` string coincidentally cast to the same index it named) and was only exposed once the target orientation differed from index 0. **Fixed** by storing the bare enum index (`window/handheld/orientation=1`) instead of a string — commit `8d3d83b`. A first fix attempt (adding a nonexistent `screen/orientation` key to `export_presets.cfg`) was a no-op and has been fully reverted; verified empirically via `aapt dump xmltree` against the built manifest before and after the real fix, plus an on-device screenshot.
+- Full SDD ledger (root-cause narrative, verification steps, reviewer notes for all 8 tasks) lives at `.superpowers/sdd/2026-08-18-vertical-orientation/progress.md` in this worktree — read it for the complete blow-by-blow if resuming this branch.
+- **User confirmed on the physical device, post-fix: "everything works great"** — vertical orientation, layout, and the full gameplay loop are all working as intended.
+- **Follow-up suggestion from the user (not yet implemented)**: hopping over an obstacle/treat currently only changes the player's rendered Y via `get_track_y()`/a hop-height offset — there's no depth cue, so a successful hop doesn't visually read as "jumping over" the thing it cleared. User wants a pseudo-3D lift effect (e.g. player sprite scales up and/or a ground shadow shrinks/separates during the hop) so a clear reads as jumping *over* rather than just passing through. Needs a short design pass before implementing (visual/feel change, not a bugfix) — see below.
+- **Not yet done**: merging `vertical-orientation` back to `main`. This branch is still open pending the hop-depth-cue follow-up and the final whole-branch review step of the SDD workflow (dispatch final code reviewer, address findings, then `superpowers:finishing-a-development-branch`).
 
 ---
 

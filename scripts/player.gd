@@ -18,7 +18,7 @@ const BASELINE_Y := 1000.0
 ## Subway-Surfers-style feel pass: pulls the camera's world-anchor point up
 ## so the player renders lower in frame (not dead center), leaving more
 ## visible runway above for the rival/obstacles/treats to be seen coming.
-const CAMERA_Y_OFFSET_PX := 230.0
+const CAMERA_Y_OFFSET_PX := 486.0
 const CHARGE_SCALE := Vector2(1.3, 0.65)
 const HOP_VISUAL_LIFT_SCALE := 1.32
 const HOP_SHADOW_MIN_SCALE := 0.4
@@ -228,6 +228,12 @@ func is_hop_clearing() -> bool:
 
 func get_speed_px_s() -> float:
 	return _current_speed_px_s
+
+func on_obstacle_cleared() -> void:
+	_flash(Color(0.3, 1.0, 0.3), "DODGED!")
+
+func on_treat_dodged() -> void:
+	_flash_label("DODGED!")
 
 func on_projectile_hit() -> void:
 	## Placeholder "ouch" cue — real hit consequences (revive flow, GameManager)

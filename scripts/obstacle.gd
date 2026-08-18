@@ -38,7 +38,11 @@ func _physics_process(_delta: float) -> void:
 	if _player.has_method("is_invincible") and _player.is_invincible():
 		queue_free()
 		return
-	if _player.has_method("is_hop_clearing") and _player.is_hop_clearing():
+	var cleared: bool = _player.has_method("is_hop_clearing") and _player.is_hop_clearing()
+	print_debug("Obstacle resolve: distance=%.1f target=%.1f hop_offset=%.1f cleared=%s" % [_player.distance_traveled, target_progress, _player.hop_offset, cleared])
+	if cleared:
+		if _player.has_method("on_obstacle_cleared"):
+			_player.on_obstacle_cleared()
 		return
 	if _player.has_method("on_obstacle_hit"):
 		_player.on_obstacle_hit()

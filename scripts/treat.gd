@@ -37,7 +37,11 @@ func _physics_process(_delta: float) -> void:
 		return
 	_resolved = true
 	var cleared: bool = _player.has_method("is_hop_clearing") and _player.is_hop_clearing()
-	if not cleared and _player.has_method("on_treat_collected"):
+	print_debug("Treat resolve: distance=%.1f target=%.1f hop_offset=%.1f cleared=%s" % [_player.distance_traveled, _progress, _player.hop_offset, cleared])
+	if cleared:
+		if _player.has_method("on_treat_dodged"):
+			_player.on_treat_dodged()
+	elif _player.has_method("on_treat_collected"):
 		_player.on_treat_collected()
 	_return_to_pool()
 

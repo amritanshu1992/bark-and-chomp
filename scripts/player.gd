@@ -21,9 +21,15 @@ const BASELINE_Y := 1000.0
 const CAMERA_Y_OFFSET_PX := 486.0
 const CHARGE_SCALE := Vector2(1.3, 0.65)
 const HOP_VISUAL_LIFT_SCALE := 1.32
-const HOP_SHADOW_MIN_SCALE := 0.4
 const HOP_SHADOW_MIN_ALPHA := 0.15
 const HOP_SHADOW_MAX_ALPHA := 0.4
+## A flat parabola (same gravity up and down) reads as an abrupt "snap" --
+## floating a bit longer near the top and dropping faster at the bottom is
+## the standard jump-feel trick and reads as a proper hop instead. Also
+## widens the hop-clearance window (more time above HOP_CLEARANCE_MIN_PX),
+## which playtesting separately flagged as feeling too tight.
+const HOP_RISE_GRAVITY_MULT := 0.8
+const HOP_FALL_GRAVITY_MULT := 1.6
 const LABEL_FLASH_S := 0.4
 const BARK_HINT_S := 2.5
 const BARK_HINT_TEXT := "Watch the vacuum!\nThe instant it turns RED,\nHOLD to bark it back!"
@@ -70,8 +76,10 @@ func _ready() -> void:
 
 	global_position = Vector2(FIXED_X, BASELINE_Y)
 	# Apex height of a full hop (v^2 / 2g), used to normalize the lift-scale/
-	# shadow-shrink cue below so it reads correctly across tuning changes.
-	_max_hop_offset_px = (tuning.hop_impulse * tuning.hop_impulse) / (2.0 * tuning.gravity) * PX_PER_UNIT
+	# shadow-fade cue below so it reads correctly across tuning changes.
+	# Uses the rise-phase gravity (see HOP_RISE_GRAVITY_MULT) since that's
+	# the gravity actually in effect on the way up to the apex.
+	_max_hop_offset_px = (tuning.hop_impulse * tuning.hop_impulse) / (2.0 * tuning.gravity * HOP_RISE_GRAVITY_MULT) * PX_PER_UNIT
 
 ## Returns the screen Y an entity at the given progress should render at
 ## right now. progress > distance_traveled = still ahead (ie. "up the
@@ -88,7 +96,8 @@ func _physics_process(delta: float) -> void:
 	distance_traveled += _current_speed_px_s * delta
 
 	if hop_offset > 0.0 or hop_velocity != 0.0:
-		hop_velocity -= tuning.gravity * PX_PER_UNIT * delta
+		var gravity_mult := HOP_FALL_GRAVITY_MULT if hop_velocity < 0.0 else HOP_RISE_GRAVITY_MULT
+		hop_velocity -= tuning.gravity * PX_PER_UNIT * gravity_mult * delta
 		hop_offset += hop_velocity * delta
 		if hop_offset <= 0.0:
 			hop_offset = 0.0
@@ -100,11 +109,12 @@ func _physics_process(delta: float) -> void:
 	# BASELINE_Y - CAMERA_Y_OFFSET_PX (see const comment above).
 	camera.position = Vector2(0.0, hop_offset - CAMERA_Y_OFFSET_PX)
 
-	# Pseudo-3D hop cue: the sprite scales up and the shadow shrinks/fades
-	# as hop height increases, so a hop reads as lifting toward the camera
-	# rather than just sliding up the screen. Shadow counters the parent's
-	# hop bob the same way the camera does, so it stays pinned at ground
-	# level while the sprite rises off it.
+	# Pseudo-3D hop cue: the sprite scales up as hop height increases, so a
+	# hop reads as lifting toward the camera rather than just sliding up the
+	# screen. Shadow counters the parent's hop bob the same way the camera
+	# does, so it stays pinned at ground level while the sprite rises off
+	# it, and just fades (no scale change -- shrinking read as visual noise
+	# on top of the sprite's own scale-up, per playtest feedback).
 	# sqrt-eased so the cue reaches near-peak intensity quickly and holds it,
 	# instead of tracking the raw parabola (which only grazes the top for an
 	# instant) -- needed to keep the cue readable now that the snappier hop
@@ -112,7 +122,6 @@ func _physics_process(delta: float) -> void:
 	var raw_hop_ratio := clampf(hop_offset / _max_hop_offset_px, 0.0, 1.0)
 	var hop_ratio := sqrt(raw_hop_ratio)
 	shadow.position = Vector2(0.0, hop_offset)
-	shadow.scale = Vector2.ONE * lerpf(1.0, HOP_SHADOW_MIN_SCALE, hop_ratio)
 	shadow.modulate.a = lerpf(HOP_SHADOW_MAX_ALPHA, HOP_SHADOW_MIN_ALPHA, hop_ratio)
 	if not _is_charging:
 		visual.scale = Vector2.ONE * lerpf(1.0, HOP_VISUAL_LIFT_SCALE, hop_ratio)

@@ -48,6 +48,8 @@ const METER_BAR_MAX_WIDTH := 260.0
 @onready var bark_hitbox: Area2D = $BarkHitbox
 @onready var bark_hitbox_shape: CollisionShape2D = $BarkHitbox/CollisionShape2D
 @onready var anim_player: AnimationPlayer = $AnimationPlayer
+@onready var sfx_player: AudioStreamPlayer = $SfxPlayer
+@onready var loop_player: AudioStreamPlayer = $LoopPlayer
 
 var distance_traveled: float = 0.0
 var hop_offset: float = 0.0
@@ -65,6 +67,22 @@ var _run_time_elapsed: float = 0.0
 var treats_collected: int = 0
 var _hit_times: Array[float] = []
 var _is_dead: bool = false
+
+## Placeholder audio scaffolding, same spirit as the AnimationPlayer rig above:
+## trigger call sites (_play_sfx/_play_loop) are wired now against every cue
+## named in docs/asset_list.md, but every stream is null until real audio
+## drops in -- _play_sfx/_play_loop no-op safely on a null stream, so nothing
+## plays yet. Only this dictionary's values change once real SFX exist.
+var _sfx_streams: Dictionary = {
+	"blast": null,
+	"whimper": null,
+	"chomp": null,
+	"treat": null,
+}
+var _loop_streams: Dictionary = {
+	"charge": null,
+	"zoomies": null,
+}
 
 func _ready() -> void:
 	input_controller.hop_requested.connect(_on_hop_requested)
@@ -151,6 +169,25 @@ func _play_anim(anim_name: String) -> void:
 	if anim_player.has_animation(anim_name):
 		anim_player.play(anim_name)
 
+func _play_sfx(sfx_name: String) -> void:
+	var stream: AudioStream = _sfx_streams.get(sfx_name)
+	if stream == null:
+		return
+	sfx_player.stream = stream
+	sfx_player.play()
+
+func _play_loop(loop_name: String) -> void:
+	var stream: AudioStream = _loop_streams.get(loop_name)
+	if stream == null:
+		return
+	if loop_player.stream == stream and loop_player.playing:
+		return
+	loop_player.stream = stream
+	loop_player.play()
+
+func _stop_loop() -> void:
+	loop_player.stop()
+
 ## Returns the screen Y an entity at the given progress should render at
 ## right now. progress > distance_traveled = still ahead (ie. "up the
 ## screen", smaller Y, hasn't reached the player yet).
@@ -228,6 +265,7 @@ func _on_zoomie_nudge_requested() -> void:
 func _on_charge_started() -> void:
 	_is_charging = true
 	_play_anim("charge")
+	_play_loop("charge")
 	debug_label.text = "CHARGING"
 	_has_charged_ever = true
 
@@ -263,11 +301,14 @@ func _on_bark_ready() -> void:
 
 func _on_bark_released(full: bool) -> void:
 	_is_charging = false
+	_stop_loop()
 	if full:
 		_play_anim("blast")
+		_play_sfx("blast")
 		_flash_label("BLAST")
 	else:
 		_play_anim("whimper")
+		_play_sfx("whimper")
 		_flash_label("WHIMPER")
 
 func add_meter(amount: float) -> void:
@@ -281,10 +322,12 @@ func add_meter(amount: float) -> void:
 func on_treat_collected() -> void:
 	treats_collected += 1
 	add_meter(tuning.treat_meter_value)
+	_play_sfx("treat")
 	_flash_label("TREAT")
 
 func on_chomp_landed() -> void:
 	_play_anim("chomp")
+	_play_sfx("chomp")
 	_flash_label("CHOMP!")
 
 func _start_zoomies() -> void:
@@ -294,6 +337,7 @@ func _start_zoomies() -> void:
 	_update_meter_bar()
 	input_controller.zoomies_active = true
 	_play_anim("zoomies")
+	_play_loop("zoomies")
 	debug_label.text = "ZOOMIES!"
 	# input_controller's touch handler short-circuits (no bark_released signal)
 	# once zoomies_active is true, so a charge started right before Zoomies
@@ -306,6 +350,7 @@ func _end_zoomies() -> void:
 	zoomies_active = false
 	input_controller.zoomies_active = false
 	_play_anim("run")
+	_stop_loop()
 	if debug_label.text == "ZOOMIES!":
 		debug_label.text = ""
 

@@ -32,6 +32,8 @@ const NOISE_FREQUENCY := 0.4  # slow sine drift; not a called-out tunable in the
 @onready var player: Node2D = get_node("../Player")
 @onready var visual: ColorRect = $Visual
 @onready var anim_player: AnimationPlayer = $AnimationPlayer
+@onready var sfx_player: AudioStreamPlayer = $SfxPlayer
+@onready var loop_player: AudioStreamPlayer = $LoopPlayer
 
 var _progress: float = 0.0
 var _state: State = State.CHASING
@@ -43,10 +45,22 @@ var _time: float = 0.0
 var _pool: Array[Area2D] = []
 var _first_throw_done: bool = false
 
+## Placeholder audio scaffolding -- same pattern as player.gd's, see there
+## for rationale. Every stream is null until real SFX from docs/asset_list.md
+## drop in.
+var _sfx_streams: Dictionary = {
+	"panic": null,
+	"defeat": null,
+}
+var _loop_streams: Dictionary = {
+	"whir": null,
+}
+
 func _ready() -> void:
 	anim_player.add_animation_library("", _build_animation_library())
 	_progress = player.distance_traveled + tuning.rival_target_distance * PX_PER_UNIT
 	_render()
+	_play_loop("whir")
 	for i in POOL_SIZE:
 		var p: Area2D = projectile_scene.instantiate()
 		add_child(p)
@@ -132,6 +146,25 @@ func _play_anim(anim_name: String) -> void:
 	if anim_player.has_animation(anim_name):
 		anim_player.play(anim_name)
 
+func _play_sfx(sfx_name: String) -> void:
+	var stream: AudioStream = _sfx_streams.get(sfx_name)
+	if stream == null:
+		return
+	sfx_player.stream = stream
+	sfx_player.play()
+
+func _play_loop(loop_name: String) -> void:
+	var stream: AudioStream = _loop_streams.get(loop_name)
+	if stream == null:
+		return
+	if loop_player.stream == stream and loop_player.playing:
+		return
+	loop_player.stream = stream
+	loop_player.play()
+
+func _stop_loop() -> void:
+	loop_player.stop()
+
 func _player_speed_px_s() -> float:
 	if player.has_method("get_speed_px_s"):
 		return player.get_speed_px_s()
@@ -187,6 +220,7 @@ func on_deflect_hit() -> void:
 	_progress += KNOCKBACK_PX
 	_render()
 	_play_anim("hit")
+	_play_sfx("panic")
 	if player.has_method("add_meter"):
 		player.add_meter(tuning.deflect_hit_meter_value)
 
@@ -195,6 +229,7 @@ func _enter_stunned() -> void:
 	_stun_timer_s = tuning.stun_duration_s
 	_chomp_window_s = -1.0
 	_play_anim("stunned")
+	_stop_loop()
 
 func _update_chomp_window(delta: float) -> void:
 	var player_zoomies: bool = player.has_method("is_zoomies_active") and player.is_zoomies_active()
@@ -212,6 +247,7 @@ func _update_chomp_window(delta: float) -> void:
 
 func _recover_to_chasing() -> void:
 	_play_anim("run")
+	_play_loop("whir")
 	# Escape animation stand-in: the vacuum was frozen in place for react+stun while
 	# the player kept advancing, so a plain rubber-band correction would leave it
 	# crawling back into frame for several seconds. Snap back into range instead.
@@ -223,11 +259,14 @@ func _recover_to_chasing() -> void:
 func _on_chomped() -> void:
 	_state = State.CAUGHT
 	_play_anim("defeat")  # dust-bag-burst stand-in
+	_stop_loop()
+	_play_sfx("defeat")
 	if player.has_method("on_chomp_landed"):
 		player.on_chomp_landed()
 	await get_tree().create_timer(CAUGHT_RESPAWN_DELAY_S).timeout
 	_progress = player.distance_traveled + tuning.rival_target_distance * PX_PER_UNIT + RESPAWN_MARGIN_PX
 	_render()
 	_play_anim("run")
+	_play_loop("whir")
 	_reroll_throw_timer()
 	_state = State.CHASING

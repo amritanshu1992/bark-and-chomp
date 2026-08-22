@@ -31,6 +31,7 @@ const NOISE_FREQUENCY := 0.4  # slow sine drift; not a called-out tunable in the
 
 @onready var player: Node2D = get_node("../Player")
 @onready var visual: ColorRect = $Visual
+@onready var anim_player: AnimationPlayer = $AnimationPlayer
 
 var _progress: float = 0.0
 var _state: State = State.CHASING
@@ -43,6 +44,7 @@ var _pool: Array[Area2D] = []
 var _first_throw_done: bool = false
 
 func _ready() -> void:
+	anim_player.add_animation_library("", _build_animation_library())
 	_progress = player.distance_traveled + tuning.rival_target_distance * PX_PER_UNIT
 	_render()
 	for i in POOL_SIZE:
@@ -87,6 +89,49 @@ func _physics_process(delta: float) -> void:
 func _render() -> void:
 	global_position = Vector2(LANE_X, player.get_track_y(_progress))
 
+## Placeholder animation rig, built in code rather than authored in the
+## .tscn -- see player.gd's identical pattern / docs/superpowers/specs
+## 2026-08-23-animation-scaffolding-design.md for why.
+func _build_animation_library() -> AnimationLibrary:
+	var lib := AnimationLibrary.new()
+	lib.add_animation("run", _make_animation({
+		"modulate": [[0.0, Color.WHITE]],
+		"scale": [[0.0, Vector2.ONE]],
+	}))
+	lib.add_animation("throw", _make_animation({
+		"modulate": [[0.0, Color(1.0, 0.2, 0.1)]],
+		"scale": [[0.0, Vector2(1.4, 1.4)]],
+	}))
+	lib.add_animation("hit", _make_animation({
+		"modulate": [[0.0, Color(1.0, 0.3, 0.3)]],
+		"scale": [[0.0, Vector2.ONE]],
+	}))
+	lib.add_animation("stunned", _make_animation({
+		"modulate": [[0.0, Color(0.6, 0.6, 0.6)]],
+	}))
+	lib.add_animation("defeat", _make_animation({
+		"modulate": [[0.0, Color(1.0, 0.85, 0.2)]],
+	}))
+	return lib
+
+func _make_animation(tracks: Dictionary) -> Animation:
+	var anim := Animation.new()
+	var length := 0.001
+	for prop in tracks:
+		for key in tracks[prop]:
+			length = maxf(length, key[0] + 0.001)
+	anim.length = length
+	for prop in tracks:
+		var track_idx := anim.add_track(Animation.TYPE_VALUE)
+		anim.track_set_path(track_idx, NodePath("Visual:%s" % prop))
+		for key in tracks[prop]:
+			anim.track_insert_key(track_idx, key[0], key[1])
+	return anim
+
+func _play_anim(anim_name: String) -> void:
+	if anim_player.has_animation(anim_name):
+		anim_player.play(anim_name)
+
 func _player_speed_px_s() -> float:
 	if player.has_method("get_speed_px_s"):
 		return player.get_speed_px_s()
@@ -116,14 +161,12 @@ func _start_throw() -> void:
 		if player.has_method("maybe_show_bark_hint"):
 			await player.maybe_show_bark_hint()
 	_state = State.THROWING
-	visual.modulate = Color(1.0, 0.2, 0.1)  # loud wind-up cue -- attacks are never cheap
-	visual.scale = Vector2(1.4, 1.4)
+	_play_anim("throw")  # loud wind-up cue -- attacks are never cheap
 	await get_tree().create_timer(tuning.throw_telegraph_s).timeout
 	if _state != State.THROWING:
 		return  # deflect-hit landed mid-telegraph; don't let the throw stomp REACT/STUNNED
 	_throw_projectile()
-	visual.modulate = Color.WHITE
-	visual.scale = Vector2.ONE
+	_play_anim("run")
 	_reroll_throw_timer()
 	_state = State.CHASING
 
@@ -143,8 +186,7 @@ func on_deflect_hit() -> void:
 	_react_timer_s = REACT_DURATION_S
 	_progress += KNOCKBACK_PX
 	_render()
-	visual.scale = Vector2.ONE
-	visual.modulate = Color(1.0, 0.3, 0.3)
+	_play_anim("hit")
 	if player.has_method("add_meter"):
 		player.add_meter(tuning.deflect_hit_meter_value)
 
@@ -152,7 +194,7 @@ func _enter_stunned() -> void:
 	_state = State.STUNNED
 	_stun_timer_s = tuning.stun_duration_s
 	_chomp_window_s = -1.0
-	visual.modulate = Color(0.6, 0.6, 0.6)
+	_play_anim("stunned")
 
 func _update_chomp_window(delta: float) -> void:
 	var player_zoomies: bool = player.has_method("is_zoomies_active") and player.is_zoomies_active()
@@ -169,7 +211,7 @@ func _update_chomp_window(delta: float) -> void:
 		_recover_to_chasing()  # miss: vacuum recovers and escapes
 
 func _recover_to_chasing() -> void:
-	visual.modulate = Color.WHITE
+	_play_anim("run")
 	# Escape animation stand-in: the vacuum was frozen in place for react+stun while
 	# the player kept advancing, so a plain rubber-band correction would leave it
 	# crawling back into frame for several seconds. Snap back into range instead.
@@ -180,12 +222,12 @@ func _recover_to_chasing() -> void:
 
 func _on_chomped() -> void:
 	_state = State.CAUGHT
-	visual.modulate = Color(1.0, 0.85, 0.2)  # dust-bag-burst stand-in
+	_play_anim("defeat")  # dust-bag-burst stand-in
 	if player.has_method("on_chomp_landed"):
 		player.on_chomp_landed()
 	await get_tree().create_timer(CAUGHT_RESPAWN_DELAY_S).timeout
 	_progress = player.distance_traveled + tuning.rival_target_distance * PX_PER_UNIT + RESPAWN_MARGIN_PX
 	_render()
-	visual.modulate = Color.WHITE
+	_play_anim("run")
 	_reroll_throw_timer()
 	_state = State.CHASING

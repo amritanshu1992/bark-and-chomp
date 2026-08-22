@@ -103,7 +103,12 @@ func _chase(delta: float) -> void:
 	_render()
 
 func _reroll_throw_timer() -> void:
-	_throw_timer_s = randf_range(tuning.throw_interval_min_s, tuning.throw_interval_max_s)
+	## Throws get more frequent over the run, same clock as the player's speed
+	## ramp (player.gd's get_speed_ramp_ratio()) -- one shared difficulty curve.
+	var ramp_ratio: float = player.get_speed_ramp_ratio() if player.has_method("get_speed_ramp_ratio") else 0.0
+	var min_s := lerpf(tuning.throw_interval_min_s, tuning.throw_interval_min_s_end, ramp_ratio)
+	var max_s := lerpf(tuning.throw_interval_max_s, tuning.throw_interval_max_s_end, ramp_ratio)
+	_throw_timer_s = randf_range(min_s, max_s)
 
 func _start_throw() -> void:
 	if not _first_throw_done:

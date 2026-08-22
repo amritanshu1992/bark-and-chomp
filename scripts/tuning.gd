@@ -43,5 +43,13 @@ extends Resource
 @export var throw_telegraph_s := 0.65         # must clear bark_full_charge_ms with margin to react
 @export var stun_duration_s := 2.5      # tune upward if chomps too rare
 
+# Difficulty ramp
+@export var throw_interval_min_s_end := 1.5   # throw_interval_min/max_s lerp toward these over run_speed_ramp_s -- same clock as the speed ramp
+@export var throw_interval_max_s_end := 2.0
+
+# Death
+@export var hits_to_die := 3            # projectile hits and un-hopped obstacles count equally
+@export var hit_window_s := 8.0         # rolling window -- hits older than this don't count toward death
+
 # Economy (Phase 3)
 @export var revive_cost_treats := 50

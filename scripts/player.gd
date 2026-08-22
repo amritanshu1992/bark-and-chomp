@@ -12,6 +12,8 @@ extends CharacterBody2D
 ## frame instead of via move_and_slide()/is_on_floor() -- there is no literal
 ## floor body to slide against any more.
 
+signal died
+
 const PX_PER_UNIT := 64.0
 const FIXED_X := 360.0
 const BASELINE_Y := 1000.0
@@ -61,6 +63,9 @@ var _zoomies_time_left: float = 0.0
 var _is_charging: bool = false
 var _max_hop_offset_px: float = 1.0
 var _run_time_elapsed: float = 0.0
+var treats_collected: int = 0
+var _hit_times: Array[float] = []
+var _is_dead: bool = false
 
 func _ready() -> void:
 	input_controller.hop_requested.connect(_on_hop_requested)
@@ -95,9 +100,15 @@ func get_track_y(progress: float) -> float:
 func get_offscreen_bottom_y() -> float:
 	return BASELINE_Y - CAMERA_Y_OFFSET_PX + get_viewport_rect().size.y / 2.0
 
+## How far through the speed ramp the run currently is (0 at start, 1 once
+## run_speed_ramp_s has elapsed). Also drives the rival's throw-frequency
+## ramp (rival_base.gd) -- one shared difficulty curve for the whole run.
+func get_speed_ramp_ratio() -> float:
+	return clampf(_run_time_elapsed / tuning.run_speed_ramp_s, 0.0, 1.0)
+
 func _physics_process(delta: float) -> void:
 	_run_time_elapsed += delta
-	var ramp_ratio := clampf(_run_time_elapsed / tuning.run_speed_ramp_s, 0.0, 1.0)
+	var ramp_ratio := get_speed_ramp_ratio()
 	var base_speed_u_s := lerpf(tuning.run_speed, tuning.run_speed_max, ramp_ratio)
 	var speed_mult := tuning.zoomie_speed_mult if zoomies_active else 1.0
 	_current_speed_px_s = base_speed_u_s * PX_PER_UNIT * speed_mult
@@ -201,6 +212,7 @@ func add_meter(amount: float) -> void:
 		_start_zoomies()
 
 func on_treat_collected() -> void:
+	treats_collected += 1
 	add_meter(tuning.treat_meter_value)
 	_flash_label("TREAT")
 
@@ -260,16 +272,33 @@ func on_treat_dodged() -> void:
 	_flash_label("DODGED!")
 
 func on_projectile_hit() -> void:
-	## Placeholder "ouch" cue — real hit consequences (revive flow, GameManager)
-	## land in a later phase; this just makes misses visible during playtesting.
 	_flash(Color(1.0, 0.0, 0.0), "HIT")
+	_register_hit_and_maybe_die()
 
 func on_obstacle_hit() -> void:
-	## Placeholder "ouch" cue, same convention as on_projectile_hit(). Obstacles
-	## used to be a literal physical blocker the player slid against; now that
-	## the player's X is fixed and nothing physically traverses the world, a
-	## miss is represented as an explicit hit consequence instead.
+	## Obstacles used to be a literal physical blocker the player slid against;
+	## now that the player's X is fixed and nothing physically traverses the
+	## world, a miss is represented as an explicit hit consequence instead.
 	_flash(Color(1.0, 0.0, 0.0), "OUCH")
+	_register_hit_and_maybe_die()
+
+## Pure rolling-window death check: records a hit at now_s, prunes hits older
+## than tuning.hit_window_s, and returns whether the count has reached
+## tuning.hits_to_die. Kept side-effect-free (beyond _hit_times itself) so
+## it's cheaply unit-testable -- see scripts/tests/test_hit_tracking.gd.
+## Projectile hits and un-hopped obstacles count equally toward death.
+func register_hit(now_s: float) -> bool:
+	_hit_times.append(now_s)
+	_hit_times = _hit_times.filter(func(t: float) -> bool: return now_s - t <= tuning.hit_window_s)
+	return _hit_times.size() >= tuning.hits_to_die
+
+func _register_hit_and_maybe_die() -> void:
+	if _is_dead:
+		return
+	if register_hit(_run_time_elapsed):
+		_is_dead = true
+		died.emit()
+		get_tree().paused = true
 
 func _update_meter_bar() -> void:
 	var ratio := clampf(meter / tuning.meter_max, 0.0, 1.0)

@@ -1,6 +1,6 @@
 # Handoff — "Bark & Chomp"
 
-Last updated: 2026-08-23 (session 8 cont'd — Phase 2 #3 audio scaffolding built and committed; Milestone 1.6 playtest still pending)
+Last updated: 2026-08-23 (session 9 — Milestone 1.6 GO/NO-GO gate passed via 3-tester in-person playtest; Phase 2 #4 juice built; three playtest-driven fixes built: bark-hint Continue button, eased charge/release squash tween, widened throw telegraph for reaction time)
 
 Purpose: read this first at the start of a new session to pick up exactly where things left off. It is a living doc — update it at the end of each session.
 
@@ -265,34 +265,54 @@ Brainstormed as **Bounded**. Explored first: confirmed a completely clean slate 
 - Rebuilt, reinstalled, and relaunched on the test device (Galaxy S24 Ultra); `adb logcat` showed the process alive with zero GDScript runtime errors after launch + a synthetic touch event.
 - **Not yet confirmed on-device by the user** — there's nothing audible to confirm yet (silent scaffolding by design); what matters is that nothing crashed or regressed, which logcat confirms.
 
-**Still open from Phase 2's decomposition**: #4 (juice: screen shake/hit-stop/particles) — not started.
+**Still open from Phase 2's decomposition**: #4 (juice) — see §2g below, now done.
+
+---
+
+## 2g. Milestone 1.6 GO/NO-GO (passed) + Phase 2 #4 juice + three playtest-driven fixes (session 9, 2026-08-23)
+
+**Milestone 1.6 — PASSED (GO).** The user ran the 3-tester silent-observation playtest in person on the morning of 2026-08-23 (device disconnected from the dev machine during the session — no screen recordings captured this round). User's account: the core loop landed — verdict is **GO**, confirmed explicitly when asked directly whether the loop read as instinctively fun beyond the specific complaints below. Phase 1 is complete; the project is now in Phase 2.
+
+**Three concrete findings from the 3 testers**, all treated as Phase 2 polish (Bounded, in-chat design, approved by user):
+
+1. **Bark-hint instructions unclear and dismissed too fast, out of the player's control.** Fix: replaced the hint's fixed 2.5s auto-dismiss timer with a real `ContinueButton` (new node in `player.tscn`'s `UI` `CanvasLayer`, hidden until the hint shows) that the hint now waits on (`await continue_button.pressed`) instead of a clock. Mirrors the existing Restart button's already-working pattern for taking input while `get_tree().paused = true` (`process_mode = PROCESS_MODE_ALWAYS` set on the `UI` CanvasLayer, inherited by children).
+2. **Charge/bark motion ("jump and bark") not smooth** — the charge-squash and release-unsquash were an instant scale-snap (single-keyframe `AnimationPlayer` tracks). Fix: replaced with a real eased `Tween` (`_tween_visual_scale()` in `player.gd`, `TRANS_QUAD`/`EASE_OUT`, 0.12s charge-in / 0.15s release-out), and stripped the now-redundant `scale` keyframes from the `charge`/`blast`/`whimper` `AnimationPlayer` clips (their `modulate` color-flash tracks are untouched — only the motion needed easing). Added `_squash_tween_active` state so the existing hop lift-scale cue in `_physics_process` (which also writes `visual.scale` every frame) doesn't fight the tween — guard changed from `if not _is_charging:` to `if not _is_charging and not _squash_tween_active:`. The hop itself was **not** touched — it's already continuously interpolated in code, there's no snap to fix there; further hop "smoothness" beyond this is gated on real sprite art (Phase 3).
+3. **"Press to charge and bark has very little time to react"** — raised by the user after the initial two findings, in a follow-up message. Root cause: `tuning.throw_telegraph_s` (time from the rival's red throw-telegraph flash to the projectile actually launching) was `0.65s`, barely enough margin for a human to notice the flash before `bark_full_charge_ms`=400ms of holding is needed to reach full charge — effectively little slack for reaction time before charge needs to already be underway. Fix: widened `throw_telegraph_s` 0.65→1.0 (`scripts/tuning.gd`). This is safe with no downstream retuning needed: `bark_hitbox_duration_s`'s existing 1.0s value was already derived assuming the *old* 0.65s telegraph with margin to spare (see that constant's own comment) — widening the telegraph only adds reaction buffer, it doesn't tighten the deflect window's math.
+
+**Phase 2 #4 — Juice, implemented and approved (Bounded).** New stateless `class_name Juice` (`scripts/juice.gd`, no autoload):
+- `Juice.hit_stop(tree, scale, duration_s)` — briefly drops `Engine.time_scale`, restores it on a real-time timer (`ignore_time_scale=true`) so the restore isn't itself slowed by the dip it just applied.
+- `Juice.spawn_burst(parent, position, color, count)` — placeholder flat-color one-shot `CPUParticles2D`, self-frees via its `finished` signal.
+- Screen shake lives in `player.gd` instead (`shake_camera(amount_px, duration_s)`) since it's continuous per-frame state tied to the one `Camera2D` the game has; other entities call it duck-typed (`if player.has_method("shake_camera")`), matching the existing `add_meter`/`on_chomp_landed` cross-entity call convention.
+- Wired at every impact moment `docs/asset_list.md`'s Juice section calls for: deflect (`projectile.gd`, `rival_base.gd` — small hit-stop + small shake), Chomp landing (`rival_base.gd` — bigger hit-stop + bigger shake + dust-colored burst), treat pickup (`player.gd` — gold burst at the treat's position).
+- New headless test `scripts/tests/test_juice.gd`. Hit a genuine flakiness bug while writing it: a `static func` with `await` still runs synchronously up to its first `await` even when the caller doesn't itself await it, so checking `Engine.time_scale` immediately after calling `Juice.hit_stop()` must be done *without* an intervening `await process_frame` — a frame's real-world wall-clock length isn't fixed and can race a short real-time restore timer. Fixed by checking synchronously; confirmed stable across repeated runs.
+- **Gotcha for any future new `class_name` script**: the global script class cache needs a rebuild before the new class resolves — run `Godot_..._console.exe --headless --editor --path . --quit` once after adding it (already noted in §4 below, reconfirmed here).
+- **Gotcha**: `scripts/projectile.gd` uses CRLF line endings, unlike every other script in the project (LF) — the `Edit` tool's exact-string match silently fails against it even when the visible text looks identical. Diagnose with `sed -n ... | cat -A`; fix by scripting the edit in Python, reading/writing the file in binary mode with `\r\n` in both old and new strings.
+
+**Verification this session**: full headless test suite (`test_hit_tracking`, `test_get_track_y`, `test_audio_scaffolding`, `test_juice`) all pass. Full headless smoke run of `main.tscn` — zero script/parse errors (only expected shutdown noise from the `timeout` kill and pre-existing RID-leak teardown warnings unrelated to this change). APK rebuilt (`--export-debug "Android"`) successfully.
+
+**Not yet confirmed on-device** — the phone was disconnected from the dev machine during the user's in-person 3-tester playtest and has not been reconnected yet this session. Next session (or later this session if the user reconnects it): `adb install -r` + force-stop + monkey launch + logcat check, covering both the juice feature (never yet confirmed on-device at all) and these three fixes together in one build. This is the fifth rebuild this session.
+
+**Not yet committed to git** — none of this session's work (juice files, the three fixes, this handoff update) has been committed yet.
 
 ---
 
 ## 3. What's next (in order)
 
-1. **Deflect timing confirmed fair (round 3). Discoverability hint added and confirmed working (round 4). Round 5 fixed a real bug where reacting instantly to the hint's own instruction ("hold the instant it turns red") failed to deflect — `bark_hitbox_duration_s` widened 0.3→1.0 to actually cover the red-flash-to-contact gap; deployed but not yet re-tested (see §2b Round 5).** **Immediate next action:** user to confirm instant-reaction holds now reliably deflect. Once confirmed, resume the full silent-observation playtest protocol and answer the actual 1.6 GO/NO-GO question — does the full loop (deflect/stun/Zoomies/Chomp) read as instinctively fun.
-   - Play the full sequence end-to-end: throw → hop → mid-air charge → perfect release → deflect → vacuum ragdolls → treats explode → Zoomies → chomp.
-   - Give it to 3–5 people. Watch them play. Say nothing (no coaching/hinting — that's the point of this gate).
-   - This is the **GO/NO-GO gate**: only proceed to Phase 2 (art/sound vertical slice) if the ugly prototype is instinctively fun. Do not skip this gate, and do not substitute your own single-playtest judgment for the "3-5 people, silent observation" protocol the plan specifies.
-   - **Agreed protocol** (decided this session): screen-record each tester's session (Samsung's built-in Screen Recorder, mic on to capture reactions), tap the in-game Restart button to reset state between testers (no reinstall needed), say nothing during play — including no upfront explanation of the controls before handing over the phone; the whole point is testing whether hop/charge/deflect/Zoomies/Chomp are discoverable unprompted. Watch for: does hop-vs-hold discover itself, do they react to the throw telegraph in time, does a deflect land and feel satisfying, do they notice/chase treats, does Zoomies feel like a rush, does a Chomp register as a clear "win" moment (already flagged in 1.5 notes above that the gold catch-flash is subtle — this test will show whether that's a real problem).
-   - **STALE, read this before tomorrow's playtest**: this paragraph originally said there was no death/game-over mechanic and each tester's session had to be manually time-boxed. That's no longer true as of the same-session (2026-08-23) work in §2d below — a real death state now exists (N=`hits_to_die`=3 hits within `hit_window_s`=8s rolling window ends the run, projectile hits and un-hopped obstacles weighted equally) and death now shows a real run-over overlay (distance + treats banked) instead of the old placeholder "HIT"/"OUCH" flash-with-no-consequence. **This changes the 1.6 protocol**: testers may now hit a real end-of-run screen instead of playing until manually cut off, and the 3-hits/8s tuning is an untested initial guess — if it feels too harsh (dies almost immediately) or too lenient (rarely triggers), that's itself useful signal to bring back, not necessarily a blocker. Restart button still works identically (now also unpauses first).
-   - **Build status (2026-08-23): rebuilt and installed four times this session, playtest not yet run.** First rebuild (commit `bc6170e`) picked up the merge + final-review fix pass. Second rebuild added the difficulty ramp + death state (§2d, committed/pushed as `2126464`). Third rebuild added the animation scaffolding (§2e, committed as `d65a54a`). Fourth rebuild added the audio scaffolding (§2f, committed — see git log for the hash) — **this fourth build is what's currently on the test device** (Galaxy S24 Ultra, `RZCX115BPWY`), installed via `adb install -r` + `am force-stop` + `monkey` launch, headless-smoke-tested clean, `adb logcat` clean on launch. Session ended before testers were available (late night) — **3–5 testers scheduled for the morning of 2026-08-23**.
-   - Next session: get the user's account of what happened (or review recordings together), sort real blockers from placeholder-art nitpicks, and make the GO/NO-GO call together. Do not mark 1.6 done without that.
-2. **Phase 2 code-only groundwork (gate explicitly overridden this session — see §2d/§2e/§2f).** Decomposed into 4 sub-projects; #1-3 done this session, #4 not started:
-   - [x] #1 Difficulty ramp + minimal death state — implemented, headless-verified, committed/pushed (`2126464`). **Not yet confirmed on-device.**
-   - [x] #2 Animation scaffolding — `AnimationPlayer` per entity built in code (player: idle/run/hop/charge/blast/whimper/zoomies/chomp/hit/death/victory/dodge; vacuum: run/throw/hit/stunned/defeat), driven by existing game-state signals, built against placeholder art so real sprites drop in later without rework. Headless-verified, rebuilt/redeployed, committed (`d65a54a`). **Not yet confirmed on-device** — see §2e.
-   - [x] #3 Audio scaffolding — `AudioStreamPlayer` nodes (`SfxPlayer`/`LoopPlayer` per entity) + trigger hooks wired for every SFX named in `docs/asset_list.md` (bark charge/blast/whimper, chomp, treat pickup, zoomies loop, vacuum whir/panic/defeat), all streams `null` until real audio exists (silent scaffolding, per user's confirmed choice). Headless-verified (new `test_audio_scaffolding.gd`), rebuilt/redeployed, committed. **Nothing audible to confirm on-device yet by design** — see §2f.
-   - [ ] #4 Juice — screen shake, hit-stop on deflect/chomp, particle emitters for treat explosions/dust-bag burst.
-   - Each of these should go through the same brainstorming-skill design-then-approve step before implementation, same as #1-3 did.
-   - Real Phase 2 art/sound assets tracked as an actionable checklist in `docs/asset_list.md` (source: GDD §9.2-9.4 / plan §2.1-2.2); nothing sourced yet — user chose code-only scaffolding first, asset sourcing deferred to the user's own time.
-3. Phase 1 ("The Ugly Capsule" prototype) status, per `bark_and_chomp_project_plan.md` §PHASE 1:
-   - [x] 1.1 Movement — confirmed working on-device (see §2 debugging journey above).
-   - [x] 1.2 Bark input state machine — confirmed working on-device (see §2 above): squash cue on charge, BLAST/WHIMPER debug label, zero accidental whimpers on intended hops.
-   - [x] 1.3 Projectile + deflect — confirmed working on-device (see §2 above): deflect feels crisp and instantaneous.
-   - [x] 1.4 Placeholder vacuum AI — confirmed working on-device (see §2 above): feels like an active nuisance, not a goalpost.
-   - [x] 1.5 Treats, Zoomie meter, Chomp — confirmed working on-device (see §2 above): full loop feels like a payoff worth chasing.
-   - [ ] 1.6 The Critical Test — next up, see above.
+1. **Reconnect the test device and confirm this session's build on-device**, then update this doc to mark that confirmed. Watch specifically for: hit-stop/shake/particle bursts feeling right (never seen on-device before), the new Continue button working correctly while paused, the charge/release squash reading as smooth now, and whether the widened throw-telegraph genuinely gives enough reaction time.
+2. Commit and push this session's work (see §2g) once the on-device check is clean.
+3. Phase 2 art/sound asset sourcing — tracked as an actionable checklist in `docs/asset_list.md` (source: GDD §9.2-9.4 / plan §2.1-2.2); nothing sourced yet, deferred to the user's own time. All 4 Phase 2 code-only sub-projects (difficulty ramp, animation scaffolding, audio scaffolding, juice) are now done — real assets are the remaining Phase 2 work.
+4. Phase 2 sub-project checklist, all code-only groundwork now done:
+   - [x] #1 Difficulty ramp + minimal death state — implemented, headless-verified, committed/pushed (`2126464`). Confirmed on-device.
+   - [x] #2 Animation scaffolding — confirmed on-device.
+   - [x] #3 Audio scaffolding — headless-verified; nothing audible to confirm by design (silent scaffolding).
+   - [x] #4 Juice — hit-stop, screen shake, particle bursts. Headless-verified this session (§2g). **Not yet confirmed on-device.**
+5. Phase 1 ("The Ugly Capsule" prototype) status, per `bark_and_chomp_project_plan.md` §PHASE 1 — **all complete**:
+   - [x] 1.1 Movement — confirmed working on-device.
+   - [x] 1.2 Bark input state machine — confirmed working on-device.
+   - [x] 1.3 Projectile + deflect — confirmed working on-device.
+   - [x] 1.4 Placeholder vacuum AI — confirmed working on-device.
+   - [x] 1.5 Treats, Zoomie meter, Chomp — confirmed working on-device.
+   - [x] 1.6 The Critical Test — **PASSED (GO)**, 3-tester in-person playtest, 2026-08-23. See §2g.
 
 **Reusable dev tooling now in place** (built during 1.1, applies to all future milestones):
 - Full build→deploy→test loop: `Godot_..._console.exe --headless --path "." --export-debug "Android" "builds/android/bark_and_chomp.apk"` → `adb install -r <apk>` → `adb shell am force-stop com.barkandchomp.game` → `adb shell monkey -p com.barkandchomp.game -c android.intent.category.LAUNCHER 1`.

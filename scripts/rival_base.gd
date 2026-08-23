@@ -25,6 +25,16 @@ const CHOMP_RADIUS_PX := 90.0
 const CAUGHT_RESPAWN_DELAY_S := 0.6
 const RESPAWN_MARGIN_PX := 200.0  # TDD Sec7.1: respawn ahead at target_distance + margin
 const NOISE_FREQUENCY := 0.4  # slow sine drift; not a called-out tunable in the TDD
+const DEFLECT_HIT_STOP_SCALE := 0.05
+const DEFLECT_HIT_STOP_S := 0.06
+const DEFLECT_SHAKE_PX := 6.0
+const DEFLECT_SHAKE_S := 0.15
+const CHOMP_HIT_STOP_SCALE := 0.05
+const CHOMP_HIT_STOP_S := 0.12
+const CHOMP_SHAKE_PX := 14.0
+const CHOMP_SHAKE_S := 0.25
+const CHOMP_BURST_COLOR := Color(0.5, 0.4, 0.3)
+const CHOMP_BURST_COUNT := 20
 
 @export var tuning: Tuning = preload("res://resources/tuning.tres")
 @export var projectile_scene: PackedScene = preload("res://scenes/projectile.tscn")
@@ -221,6 +231,9 @@ func on_deflect_hit() -> void:
 	_render()
 	_play_anim("hit")
 	_play_sfx("panic")
+	Juice.hit_stop(get_tree(), DEFLECT_HIT_STOP_SCALE, DEFLECT_HIT_STOP_S)
+	if player.has_method("shake_camera"):
+		player.shake_camera(DEFLECT_SHAKE_PX, DEFLECT_SHAKE_S)
 	if player.has_method("add_meter"):
 		player.add_meter(tuning.deflect_hit_meter_value)
 
@@ -261,6 +274,10 @@ func _on_chomped() -> void:
 	_play_anim("defeat")  # dust-bag-burst stand-in
 	_stop_loop()
 	_play_sfx("defeat")
+	Juice.hit_stop(get_tree(), CHOMP_HIT_STOP_SCALE, CHOMP_HIT_STOP_S)
+	if player.has_method("shake_camera"):
+		player.shake_camera(CHOMP_SHAKE_PX, CHOMP_SHAKE_S)
+	Juice.spawn_burst(get_tree().current_scene, global_position, CHOMP_BURST_COLOR, CHOMP_BURST_COUNT)
 	if player.has_method("on_chomp_landed"):
 		player.on_chomp_landed()
 	await get_tree().create_timer(CAUGHT_RESPAWN_DELAY_S).timeout

@@ -40,7 +40,7 @@ extends Resource
 @export var rival_max_adjust := 3.0           # u/s clamp on rubber-band correction
 @export var throw_interval_min_s := 3.0
 @export var throw_interval_max_s := 4.0
-@export var throw_telegraph_s := 0.65         # must clear bark_full_charge_ms with margin to react
+@export var throw_telegraph_s := 1.0          # must clear bark_full_charge_ms with margin to react -- widened 0.65->1.0 after 1.6 playtest found reaction time "very little": 0.65s barely covers a human noticing the red flash before bark_full_charge_ms=400ms is needed, leaving no slack. bark_hitbox_duration_s's 1.0s already assumed this exact 0.65 value with margin to spare (see its comment), so this only adds reaction buffer -- it doesn't tighten anything downstream.
 @export var stun_duration_s := 2.5      # tune upward if chomps too rare
 
 # Difficulty ramp

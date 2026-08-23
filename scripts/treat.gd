@@ -54,7 +54,7 @@ func _physics_process(_delta: float) -> void:
 			_player.on_treat_dodged()
 		return
 	if _player.has_method("on_treat_collected"):
-		_player.on_treat_collected()
+		_player.on_treat_collected(global_position)
 	_return_to_pool()
 
 func _return_to_pool() -> void:

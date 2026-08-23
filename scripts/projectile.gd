@@ -25,6 +25,10 @@ const LANE_X := 360.0
 ## catch a rival that's chasing at a ramped-up run speed -- 320px/s clears
 ## the rubber-band cap (tuning.rival_max_adjust=3u/s=192px/s) with margin.
 const DEFLECT_RETURN_MARGIN_PX_S := 320.0
+const DEFLECT_HIT_STOP_SCALE := 0.05
+const DEFLECT_HIT_STOP_S := 0.06
+const DEFLECT_SHAKE_PX := 6.0
+const DEFLECT_SHAKE_S := 0.15
 
 var _progress: float = 0.0
 var _progress_velocity: float = 0.0
@@ -75,6 +79,9 @@ func _on_area_entered(area: Area2D) -> void:
 			return_px_s = maxf(return_px_s, _player.get_speed_px_s() + DEFLECT_RETURN_MARGIN_PX_S)
 		_progress_velocity = return_px_s
 		visual.modulate = Color(1.0, 0.5, 0.0)
+		Juice.hit_stop(get_tree(), DEFLECT_HIT_STOP_SCALE, DEFLECT_HIT_STOP_S)
+		if _player and _player.has_method("shake_camera"):
+			_player.shake_camera(DEFLECT_SHAKE_PX, DEFLECT_SHAKE_S)
 		print_debug("Projectile deflected: return_px_s=%.1f" % return_px_s)
 	elif area.is_in_group("rival"):
 		if deflected and area.has_method("on_deflect_hit"):

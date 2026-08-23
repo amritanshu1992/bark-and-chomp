@@ -32,9 +32,12 @@ const HOP_SHADOW_MAX_ALPHA := 0.4
 const HOP_RISE_GRAVITY_MULT := 0.8
 const HOP_FALL_GRAVITY_MULT := 1.6
 const LABEL_FLASH_S := 0.4
-const BARK_HINT_S := 2.5
 const BARK_HINT_TEXT := "Watch the vacuum!\nThe instant it turns RED,\nHOLD to bark it back!"
+const CHARGE_SQUASH_S := 0.12
+const RELEASE_UNSQUASH_S := 0.15
 const METER_BAR_MAX_WIDTH := 260.0
+const TREAT_BURST_COLOR := Color(0.95, 0.85, 0.2)
+const TREAT_BURST_COUNT := 10
 
 @export var tuning: Tuning = preload("res://resources/tuning.tres")
 
@@ -45,6 +48,7 @@ const METER_BAR_MAX_WIDTH := 260.0
 @onready var debug_label: Label = $UI/DebugLabel
 @onready var meter_bar_fill: ColorRect = $UI/MeterBarFill
 @onready var hint_label: Label = $UI/HintLabel
+@onready var continue_button: Button = $UI/ContinueButton
 @onready var bark_hitbox: Area2D = $BarkHitbox
 @onready var bark_hitbox_shape: CollisionShape2D = $BarkHitbox/CollisionShape2D
 @onready var anim_player: AnimationPlayer = $AnimationPlayer
@@ -67,6 +71,11 @@ var _run_time_elapsed: float = 0.0
 var treats_collected: int = 0
 var _hit_times: Array[float] = []
 var _is_dead: bool = false
+var _shake_time_left: float = 0.0
+var _shake_duration_s: float = 0.0
+var _shake_amount_px: float = 0.0
+var _squash_tween: Tween
+var _squash_tween_active: bool = false
 
 ## Placeholder audio scaffolding, same spirit as the AnimationPlayer rig above:
 ## trigger call sites (_play_sfx/_play_loop) are wired now against every cue
@@ -121,16 +130,17 @@ func _build_animation_library() -> AnimationLibrary:
 		"scale": [[0.0, Vector2.ONE]],
 	}))
 	lib.add_animation("hop", _make_animation({}))
-	lib.add_animation("charge", _make_animation({
-		"scale": [[0.0, Vector2(1.3, 0.65)]],
-	}))
+	## Squash-in/un-squash scale is handled by a real eased Tween instead
+	## (see _tween_visual_scale, called from _on_charge_started/_on_bark_released)
+	## -- a single-keyframe track here just snaps instantly, which playtesting
+	## flagged as feeling abrupt. Modulate flashes stay instant on purpose --
+	## only the motion needed easing, not the color cue.
+	lib.add_animation("charge", _make_animation({}))
 	lib.add_animation("blast", _make_animation({
 		"modulate": [[0.0, Color(1.0, 0.6, 0.1)], [LABEL_FLASH_S, Color.WHITE]],
-		"scale": [[0.0, Vector2.ONE]],
 	}))
 	lib.add_animation("whimper", _make_animation({
 		"modulate": [[0.0, Color(0.75, 0.75, 0.75)], [LABEL_FLASH_S, Color.WHITE]],
-		"scale": [[0.0, Vector2.ONE]],
 	}))
 	lib.add_animation("zoomies", _make_animation({
 		"modulate": [[0.0, Color(1.0, 0.4, 0.8)]],
@@ -188,6 +198,23 @@ func _play_loop(loop_name: String) -> void:
 func _stop_loop() -> void:
 	loop_player.stop()
 
+func shake_camera(amount_px: float, duration_s: float) -> void:
+	_shake_amount_px = amount_px
+	_shake_duration_s = duration_s
+	_shake_time_left = duration_s
+
+## Eased squash-in/un-squash for charge/release, replacing the old instant
+## scale-snap AnimationPlayer keyframes -- 1.6 playtest flagged that motion
+## as not smooth. _squash_tween_active gates the hop lift-scale cue in
+## _physics_process so the two systems don't fight over visual.scale.
+func _tween_visual_scale(target: Vector2, duration_s: float) -> void:
+	if _squash_tween:
+		_squash_tween.kill()
+	_squash_tween_active = true
+	_squash_tween = create_tween()
+	_squash_tween.tween_property(visual, "scale", target, duration_s).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	_squash_tween.finished.connect(func(): _squash_tween_active = false)
+
 ## Returns the screen Y an entity at the given progress should render at
 ## right now. progress > distance_traveled = still ahead (ie. "up the
 ## screen", smaller Y, hasn't reached the player yet).
@@ -227,8 +254,15 @@ func _physics_process(delta: float) -> void:
 	global_position = Vector2(FIXED_X, BASELINE_Y - hop_offset)
 	# Camera is a child of Player -- cancel the parent's hop bob in local
 	# space so the camera's global Y always stays pinned at
-	# BASELINE_Y - CAMERA_Y_OFFSET_PX (see const comment above).
-	camera.position = Vector2(0.0, hop_offset - CAMERA_Y_OFFSET_PX)
+	# BASELINE_Y - CAMERA_Y_OFFSET_PX (see const comment above). Juice-driven
+	# screen shake (shake_camera()) layers an additional decaying random
+	# jitter on top of that same baseline each frame.
+	var shake_offset := Vector2.ZERO
+	if _shake_time_left > 0.0:
+		_shake_time_left -= delta
+		var shake_ratio := clampf(_shake_time_left / _shake_duration_s, 0.0, 1.0)
+		shake_offset = Vector2(randf_range(-1.0, 1.0), randf_range(-1.0, 1.0)) * _shake_amount_px * shake_ratio
+	camera.position = Vector2(0.0, hop_offset - CAMERA_Y_OFFSET_PX) + shake_offset
 
 	# Pseudo-3D hop cue: the sprite scales up as hop height increases, so a
 	# hop reads as lifting toward the camera rather than just sliding up the
@@ -244,7 +278,7 @@ func _physics_process(delta: float) -> void:
 	var hop_ratio := sqrt(raw_hop_ratio)
 	shadow.position = Vector2(0.0, hop_offset)
 	shadow.modulate.a = lerpf(HOP_SHADOW_MAX_ALPHA, HOP_SHADOW_MIN_ALPHA, hop_ratio)
-	if not _is_charging:
+	if not _is_charging and not _squash_tween_active:
 		visual.scale = Vector2.ONE * lerpf(1.0, HOP_VISUAL_LIFT_SCALE, hop_ratio)
 
 	if zoomies_active:
@@ -266,6 +300,7 @@ func _on_charge_started() -> void:
 	_is_charging = true
 	_play_anim("charge")
 	_play_loop("charge")
+	_tween_visual_scale(Vector2(1.3, 0.65), CHARGE_SQUASH_S)
 	debug_label.text = "CHARGING"
 	_has_charged_ever = true
 
@@ -282,7 +317,9 @@ func maybe_show_bark_hint() -> void:
 		return
 	get_tree().paused = true
 	hint_label.text = BARK_HINT_TEXT
-	await get_tree().create_timer(BARK_HINT_S).timeout
+	continue_button.visible = true
+	await continue_button.pressed
+	continue_button.visible = false
 	hint_label.text = ""
 	get_tree().paused = false
 
@@ -302,6 +339,7 @@ func _on_bark_ready() -> void:
 func _on_bark_released(full: bool) -> void:
 	_is_charging = false
 	_stop_loop()
+	_tween_visual_scale(Vector2.ONE, RELEASE_UNSQUASH_S)
 	if full:
 		_play_anim("blast")
 		_play_sfx("blast")
@@ -319,11 +357,12 @@ func add_meter(amount: float) -> void:
 	if meter >= tuning.meter_max:
 		_start_zoomies()
 
-func on_treat_collected() -> void:
+func on_treat_collected(at_position: Vector2 = Vector2.ZERO) -> void:
 	treats_collected += 1
 	add_meter(tuning.treat_meter_value)
 	_play_sfx("treat")
 	_flash_label("TREAT")
+	Juice.spawn_burst(get_tree().current_scene, at_position, TREAT_BURST_COLOR, TREAT_BURST_COUNT)
 
 func on_chomp_landed() -> void:
 	_play_anim("chomp")

@@ -12,6 +12,14 @@ const MAIN_SCENE := "res://scenes/main.tscn"
 
 func _ready() -> void:
 	wallet_label.text = "Treats: %d" % Save.get_wallet()
+	settings.visibility_changed.connect(_on_settings_visibility_changed)
+
+## Hide the title's own items while the settings overlay is up, so nothing
+## shows through or overlaps it (only the background stays).
+func _on_settings_visibility_changed() -> void:
+	for child in get_children():
+		if child != settings and child.name != "Bg":
+			child.visible = not settings.visible
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_WM_GO_BACK_REQUEST and is_inside_tree():

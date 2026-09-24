@@ -51,8 +51,13 @@ func _test_title() -> void:
 	var settings: Node = title.get_node("Settings")
 	title.get_node("SettingsButton").pressed.emit()
 	_check(settings.is_open(), "the Settings button should open the overlay")
+	_check_hidden_under_settings(title, ["TitleLabel", "PlayButton", "WalletLabel", "SettingsButton"], true)
 	title.notification(Node.NOTIFICATION_WM_GO_BACK_REQUEST)
 	_check(not settings.is_open(), "Back should close the settings overlay first")
+	_check_hidden_under_settings(title, ["TitleLabel", "PlayButton", "WalletLabel", "SettingsButton"], false)
+	title.get_node("SettingsButton").pressed.emit()
+	settings.get_node("CloseButton").pressed.emit()
+	_check_hidden_under_settings(title, ["PlayButton"], false)
 	title.get_node("PlayButton").pressed.emit()
 	await _settle()
 	_check(current_scene != null and current_scene.scene_file_path == MAIN, "Play should start a run")
@@ -127,11 +132,17 @@ func _test_pause_settings_while_paused() -> void:
 	var settings: Node = menu.get_node("Settings")
 	_check(settings.is_open(), "the Settings button should open the overlay")
 	_check(settings.can_process(), "the settings overlay must keep processing while paused")
+	_check_hidden_under_settings(menu, PAUSE_ITEMS, true)
 	var sound_toggle: CheckButton = settings.get_node("SoundToggle")
 	sound_toggle.button_pressed = false
 	_check(not save.is_sound_on(), "toggling Sound while paused should save it")
 	menu.notification(Node.NOTIFICATION_WM_GO_BACK_REQUEST)
 	_check(not settings.is_open() and menu.is_open() and paused, "Back should close only the settings overlay")
+	_check_hidden_under_settings(menu, PAUSE_ITEMS, false)
+	menu.get_node("SettingsButton").pressed.emit()
+	menu.resume()
+	menu.open()
+	_check_hidden_under_settings(menu, PAUSE_ITEMS, false)
 	menu.notification(Node.NOTIFICATION_WM_GO_BACK_REQUEST)
 	_check(not paused and not menu.is_open(), "a second Back should resume")
 	await _free_current()
@@ -241,6 +252,15 @@ func _in_flight(rival: Node) -> int:
 		if child.has_method("cancel") and child.visible:
 			n += 1
 	return n
+
+const PAUSE_ITEMS := ["TitleLabel", "ResumeButton", "RestartButton", "SettingsButton", "HomeButton"]
+
+## The screen under the settings overlay hides its own items while the
+## overlay is open, so nothing shows through or overlaps it.
+func _check_hidden_under_settings(owner_node: Node, names: Array, hidden: bool) -> void:
+	for n in names:
+		var item: CanvasItem = owner_node.get_node(n)
+		_check(item.visible != hidden, "%s under settings should be %s" % [n, "hidden" if hidden else "visible"])
 
 func _check(cond: bool, msg: String) -> void:
 	if not cond:

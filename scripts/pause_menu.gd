@@ -14,6 +14,16 @@ signal home_requested
 
 @onready var settings: Control = $Settings
 
+func _ready() -> void:
+	settings.visibility_changed.connect(_on_settings_visibility_changed)
+
+## Hide the menu's own items while the settings overlay is up, so nothing
+## shows through or overlaps it (only the dim stays).
+func _on_settings_visibility_changed() -> void:
+	for child in get_children():
+		if child != settings and child.name != "Dim":
+			child.visible = not settings.visible
+
 func open() -> void:
 	if get_tree().paused:
 		return

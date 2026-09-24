@@ -1,6 +1,6 @@
 # Handoff — "Bark & Chomp"
 
-Last updated: 2026-09-24 (session 12 — Phase 3.4a menus built and headless-verified on branch `phase-3.4a-menus` (title, pause menu + auto-pause + Back, Settings, run-over Retry/Home, save v2); final review pending, not merged, not confirmed on-device. Revive + wallet also still not confirmed on-device)
+Last updated: 2026-09-24 (session 12 — Phase 3.4a menus (title, pause menu + auto-pause + Back, Settings, run-over Retry/Home, save v2) built, final-reviewed (opus, fixes applied) and **merged to `main`** locally (not pushed); not confirmed on-device. Revive + wallet also still not confirmed on-device)
 
 Purpose: read this first at the start of a new session to pick up exactly where things left off. It is a living doc — update it at the end of each session.
 
@@ -375,7 +375,7 @@ Verification: new `scripts/tests/test_revive.gd` (unit; written red first — fa
    - Die with <50 → the button is disabled and shows your balance.
    - Run-over shows `+N` and the wallet total.
    - Close and reopen the app → the wallet persisted.
-2. **Finish 3.4a** (§2j): whole-branch review, then merge `phase-3.4a-menus`. On-device check: app opens on the title → Play; II pauses; pulling down the notification shade pauses; Back pauses/resumes in a run and quits from the title; run-over Retry/Home; Sound/Music toggles persist across an app restart; an existing wallet survives the save upgrade. Then 3.4b FTUE.
+2. **3.4a is merged to `main`** (§2j; not pushed). On-device check still needed: app opens on the title → Play; II pauses; pulling down the notification shade pauses; Back pauses/resumes in a run and quits from the title; run-over Retry/Home; Sound/Music toggles persist across an app restart; an existing wallet survives the save upgrade. Then 3.4b FTUE.
 3. **Decide on the deferred 3.1a review minors** (§2i; the version-mismatch one is resolved by 3.4a). **3.1b costume shop + shop screen** come after 3.4a and costume assets.
 4. **Phase 2 art/sound asset sourcing** — tracked in `docs/asset_list.md`; deferred to the user's own time.
 5. Phase 3.3 retention v1.
@@ -384,7 +384,7 @@ Verification: new `scripts/tests/test_revive.gd` (unit; written red first — fa
    - [x] 3.1a Treat wallet + treat revive — built, headless-verified (§2i). **Not yet confirmed on-device.**
    - [ ] 3.1b Costume shop — deferred (needs 3.4 menus + costume assets)
    - [ ] 3.3 Retention v1
-   - [x] 3.4a Menus (title, pause, settings) — built, headless-verified (§2j). **Not merged / not confirmed on-device.**
+   - [x] 3.4a Menus (title, pause, settings) — built, reviewed, merged to `main` (§2j). **Not confirmed on-device.**
    - [ ] 3.4b FTUE
 7. Phase 2 sub-project checklist, all code-only groundwork now done:
    - [x] #1 Difficulty ramp + minimal death state — implemented, headless-verified, committed/pushed (`2126464`). Confirmed on-device.

@@ -98,14 +98,23 @@ offset_bottom = 780.0
 theme_override_font_sizes/font_size = 40
 text = "Watch Ad"
 
+[node name="TreatButton" type="Button" parent="UI/ReviveBg"]
+offset_left = 160.0
+offset_top = 800.0
+offset_right = 560.0
+offset_bottom = 900.0
+theme_override_font_sizes/font_size = 32
+text = "50 treats"
+
 [node name="NoButton" type="Button" parent="UI/ReviveBg"]
 offset_left = 260.0
-offset_top = 820.0
+offset_top = 930.0
 offset_right = 460.0
-offset_bottom = 890.0
+offset_bottom = 1000.0
 theme_override_font_sizes/font_size = 32
 text = "No"
 
 [connection signal="pressed" from="UI/RestartButton" to="." method="_on_restart_button_pressed"]
 [connection signal="pressed" from="UI/ReviveBg/WatchAdButton" to="." method="_on_watch_ad_button_pressed"]
 [connection signal="pressed" from="UI/ReviveBg/NoButton" to="." method="_on_no_button_pressed"]
+[connection signal="pressed" from="UI/ReviveBg/TreatButton" to="." method="_on_treat_button_pressed"]

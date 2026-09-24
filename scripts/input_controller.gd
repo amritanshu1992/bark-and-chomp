@@ -42,6 +42,21 @@ func _process(_delta: float) -> void:
 			if Time.get_ticks_msec() >= _cooldown_end_ms:
 				_state = State.IDLE
 
+## Touch events aren't delivered while the tree is paused, so a hold in progress
+## when the game paused (pause menu, focus loss) never sees its release. Drop it
+## on resume: an unconfirmed hold goes back to IDLE, and a charge ends as a
+## non-full release (never a free full blast from the time spent paused).
+func _notification(what: int) -> void:
+	if what != NOTIFICATION_UNPAUSED:
+		return
+	match _state:
+		State.TIMING:
+			_state = State.IDLE
+		State.CHARGING:
+			bark_released.emit(false)
+			_state = State.COOLDOWN
+			_cooldown_end_ms = Time.get_ticks_msec() + int(tuning.bark_cooldown_s * 1000.0)
+
 func _on_touch(pressed: bool) -> void:
 	if zoomies_active:
 		if not pressed:

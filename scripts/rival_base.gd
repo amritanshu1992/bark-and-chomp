@@ -205,7 +205,7 @@ func _start_throw() -> void:
 			await player.maybe_show_bark_hint()
 	_state = State.THROWING
 	_play_anim("throw")  # loud wind-up cue -- attacks are never cheap
-	await get_tree().create_timer(tuning.throw_telegraph_s).timeout
+	await get_tree().create_timer(tuning.throw_telegraph_s, false).timeout  # pausable: the pause menu must not eat the telegraph
 	if _state != State.THROWING:
 		return  # deflect-hit landed mid-telegraph; don't let the throw stomp REACT/STUNNED
 	_throw_projectile()
@@ -219,10 +219,9 @@ func _throw_projectile() -> void:
 	var p: Area2D = _pool.pop_back()
 	p.launch(_progress, tuning.projectile_speed * PX_PER_UNIT, player)
 
-## Phase 3.2 revive: clears every in-flight projectile (including one thrown
-## by a telegraph that finished while the revive prompt was up -- that timer
-## ignores pause) and, if just chasing, rerolls the throw timer so the next
-## attack isn't instant.
+## Phase 3.2 revive: clears every in-flight projectile and, if just chasing,
+## rerolls the throw timer so the next attack isn't instant. (A telegraph in
+## progress at death is frozen by the pause and finishes after the revive.)
 func clear_hazards() -> void:
 	for child in get_children():
 		if child.has_method("cancel"):
@@ -291,7 +290,7 @@ func _on_chomped() -> void:
 	Juice.spawn_burst(get_tree().current_scene, global_position, CHOMP_BURST_COLOR, CHOMP_BURST_COUNT)
 	if player.has_method("on_chomp_landed"):
 		player.on_chomp_landed()
-	await get_tree().create_timer(CAUGHT_RESPAWN_DELAY_S).timeout
+	await get_tree().create_timer(CAUGHT_RESPAWN_DELAY_S, false).timeout
 	_progress = player.distance_traveled + tuning.rival_target_distance * PX_PER_UNIT + RESPAWN_MARGIN_PX
 	_render()
 	_play_anim("run")

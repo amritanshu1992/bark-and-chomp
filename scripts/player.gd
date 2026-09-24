@@ -345,7 +345,7 @@ func _on_bark_ready() -> void:
 	bark_hitbox.monitorable = true
 	_bark_hitbox_token += 1
 	var my_token := _bark_hitbox_token
-	await get_tree().create_timer(tuning.bark_hitbox_duration_s).timeout
+	await get_tree().create_timer(tuning.bark_hitbox_duration_s, false).timeout  # pausable: pausing must not eat the deflect window
 	if _bark_hitbox_token == my_token:
 		bark_hitbox.monitorable = false
 
@@ -502,6 +502,6 @@ func _flash_label(text: String) -> void:
 	debug_label.text = text
 	_flash_id += 1
 	var my_id := _flash_id
-	await get_tree().create_timer(LABEL_FLASH_S).timeout
+	await get_tree().create_timer(LABEL_FLASH_S, false).timeout
 	if _flash_id == my_id:
 		debug_label.text = "ZOOMIES!" if zoomies_active else ""

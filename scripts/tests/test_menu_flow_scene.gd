@@ -29,6 +29,9 @@ func _run() -> void:
 		await _test_no_pause_over_modals()
 		await _test_pause_restart_banks()
 		await _test_pause_home_banks()
+		await _test_pause_freezes_telegraph()
+		await _test_pause_freezes_deflect_window()
+		await _test_resume_drops_stale_hold()
 	_delete_temp()
 	if ok:
 		print("PASS: menu flow scene")
@@ -176,6 +179,68 @@ func _test_pause_home_banks() -> void:
 	_check(current_scene != null and current_scene.scene_file_path == TITLE, "pause-Home should go to the title")
 	_check(not paused, "pause-Home should leave the game unpaused")
 	await _free_current()
+
+## Pausing mid wind-up must not use up the throw telegraph: nothing launches
+## while paused, and the throw still happens after Resume.
+func _test_pause_freezes_telegraph() -> void:
+	var main: Node = await _start_run(0, 0)
+	var menu: Node = _pause_menu(main)
+	var rival: Node = main.get_node("Rival")
+	rival._first_throw_done = true
+	rival._start_throw()
+	menu.open()
+	await create_timer(rival.tuning.throw_telegraph_s + 0.3).timeout
+	_check(_in_flight(rival) == 0, "no projectile should launch while paused")
+	_check(rival._state == rival.State.THROWING, "the rival should still be winding up while paused")
+	menu.resume()
+	await create_timer(rival.tuning.throw_telegraph_s + 0.2).timeout
+	_check(_in_flight(rival) == 1 or rival._state != rival.State.THROWING, "the throw should complete after Resume")
+	await _free_current()
+
+## Pausing while the deflect hitbox is live must not use up its window.
+func _test_pause_freezes_deflect_window() -> void:
+	var main: Node = await _start_run(0, 0)
+	var menu: Node = _pause_menu(main)
+	var player: Node = main.get_node("Player")
+	player._on_bark_ready()
+	menu.open()
+	await create_timer(player.tuning.bark_hitbox_duration_s + 0.3).timeout
+	_check(player.bark_hitbox.monitorable, "the deflect window should not run out while paused")
+	menu.resume()
+	await create_timer(player.tuning.bark_hitbox_duration_s + 0.2).timeout
+	_check(not player.bark_hitbox.monitorable, "the deflect window should close after Resume")
+	await _free_current()
+
+## A hold that was in progress when the game paused must not turn into a
+## charge (or stay a charge) after Resume -- the release was never seen.
+func _test_resume_drops_stale_hold() -> void:
+	var main: Node = await _start_run(0, 0)
+	var menu: Node = _pause_menu(main)
+	var player: Node = main.get_node("Player")
+	var ic: Node = player.input_controller
+	ic._on_touch(true)
+	menu.open()
+	await create_timer(ic.tuning.bark_threshold_ms / 1000.0 + 0.2).timeout
+	menu.resume()
+	await _settle()
+	_check(ic.get_state_name() == "IDLE", "a hold interrupted by pause should reset to IDLE, got " + ic.get_state_name())
+	_check(not player._is_charging, "the dog should not start charging after Resume")
+	ic._on_touch(true)
+	await create_timer(ic.tuning.bark_threshold_ms / 1000.0 + 0.2).timeout
+	_check(ic.get_state_name() == "CHARGING", "setup: a real hold should charge")
+	menu.open()
+	menu.resume()
+	await _settle()
+	_check(ic.get_state_name() != "CHARGING", "a charge interrupted by pause should end")
+	_check(not player._is_charging, "the dog should stop charging after Resume")
+	await _free_current()
+
+func _in_flight(rival: Node) -> int:
+	var n := 0
+	for child in rival.get_children():
+		if child.has_method("cancel") and child.visible:
+			n += 1
+	return n
 
 func _check(cond: bool, msg: String) -> void:
 	if not cond:

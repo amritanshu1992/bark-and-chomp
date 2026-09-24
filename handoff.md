@@ -1,6 +1,6 @@
 # Handoff — "Bark & Chomp"
 
-Last updated: 2026-09-24 (session 12 — Phase 3.4 split into 3.4a menus / 3.4b FTUE; 3.4a spec and implementation plan written and committed, not yet built. Revive + wallet still not confirmed on-device)
+Last updated: 2026-09-24 (session 12 — Phase 3.4a menus built and headless-verified on branch `phase-3.4a-menus` (title, pause menu + auto-pause + Back, Settings, run-over Retry/Home, save v2); final review pending, not merged, not confirmed on-device. Revive + wallet also still not confirmed on-device)
 
 Purpose: read this first at the start of a new session to pick up exactly where things left off. It is a living doc — update it at the end of each session.
 
@@ -336,7 +336,7 @@ Verification: new `scripts/tests/test_revive.gd` (unit; written red first — fa
 - **Deferred review minors** (not fixed; user to decide):
   - `save.gd::_write()` isn't atomic (no write-to-temp-then-rename), so a kill mid-write could reset the wallet.
   - `try_spend` return value is ignored in `_on_treat_button_pressed`.
-  - **Phase 3.3 gotcha:** when `Save.VERSION` becomes 2, v1 files must be *migrated*. Today any other version resets the wallet to 0.
+  - ~~Phase 3.3 gotcha: v1 → v2 migration~~ — resolved by 3.4a (save v2 migrates v1).
   - **Phase 4.1 gotcha:** with a real async ad SDK, disable the prompt's buttons while an ad is showing, and guard `_do_revive()` so it can't run twice.
   - The headless smoke run uses the real `user://save.json`. Today it never reaches run-over, so it never writes.
 - **Not yet confirmed on-device.**
@@ -344,13 +344,24 @@ Verification: new `scripts/tests/test_revive.gd` (unit; written red first — fa
 ## 2j. Phase 3.4 planning — split into 3.4a / 3.4b (session 12, 2026-09-24)
 
 **Divergence from `bark_and_chomp_project_plan.md` §3.4**: the plan bundles title, shop, settings, pause and a first-run tutorial. Split, by user decision:
-- **3.4a — menus**: title screen (new main scene), pause menu (II button + auto-pause on focus loss + Android Back), Settings overlay (Sound + Music toggles, version), run-over Retry/Home. Spec: `docs/superpowers/specs/2026-09-24-menus-design.md`; plan: `docs/superpowers/plans/2026-09-24-menus.md` (6 tasks). **Planned, not built.**
+- **3.4a — menus**: title screen (new main scene), pause menu (II button + auto-pause on focus loss + Android Back), Settings overlay (Sound + Music toggles, version), run-over Retry/Home. Spec: `docs/superpowers/specs/2026-09-24-menus-design.md`; plan: `docs/superpowers/plans/2026-09-24-menus.md` (6 tasks). **Built** on branch `phase-3.4a-menus` (executed natively) — see "What was built" below.
 - **3.4b — FTUE** (teach hop, bark, deflect; replaces the Round-4 one-time bark hint). Next after 3.4a.
 - **Shop screen moves to 3.1b** — nothing to sell until costumes exist.
 
 3.4a decisions: save format **v2** `{"version":2,"wallet":N,"settings":{"sound":b,"music":b}}` with v1 migration (resolves the 3.1a "version mismatch resets wallet" minor); new `default_bus_layout.tres` (Master/SFX/Music), `Save` applies bus mutes; the pause menu's single rule is "`open()` is a no-op if the tree is already paused" (covers revive prompt, run-over, bark hint); `quit_on_go_back=false`; dev Restart button becomes the pause button; `main.gd` gains `restart_run()` / `go_home()`, both banking via the existing exactly-once guard.
 - **Known limitation (accepted):** pausing mid-hold can leave `input_controller.gd` in TIMING/CHARGING, so the first touch after Resume may resolve as that stale hold.
 - **Verified spikes:** headless loads `res://default_bus_layout.tres`; `change_scene_to_file` works in `-s` tests after 2 frames; `quit_on_go_back` defaults true.
+
+**3.4a — what was built** (branch `phase-3.4a-menus`, commits `65a6309`..`ac7141b`):
+- `scripts/save.gd` v2: `is_sound_on/is_music_on/set_sound_on/set_music_on`; applies SFX/Music bus mutes on load and on every change; v1 saves migrate keeping the wallet; bad settings fall back to on without touching the wallet.
+- `default_bus_layout.tres` (Master/SFX/Music); `SfxPlayer`/`LoopPlayer` in `player.tscn` and `rival.tscn` play on `SFX`.
+- `scenes/settings.tscn` + `scripts/settings.gd` — reusable overlay (Sound, Music, version line, Back).
+- `scenes/title.tscn` + `scripts/title.gd` — now `run/main_scene`; Play, `Treats: N`, Settings; Back closes settings or quits. `project.godot` sets `config/quit_on_go_back=false`.
+- `main.tscn`: top-right `RestartButton` is now `PauseButton` ("II"); run-over panel has Retry/Home; `UI/PauseMenu` instance. `main.gd` gains `restart_run()` / `go_home()` (both bank via `_bank_run_treats()`).
+- `scenes/pause_menu.tscn` + `scripts/pause_menu.gd` — Resume/Restart/Settings/Home; opens on II, app focus loss, or Back; `open()` is a no-op while already paused.
+- Tests: `test_save.gd` extended; new `test_settings.gd`, `test_menu_flow_scene.gd` (9 scenarios); `test_treat_revive_scene.gd` calls `restart_run()`. All 10 tests pass, both smoke runs (title and `main.tscn`) clean, APK rebuilt.
+- **Test-harness gotcha found**: a `SCRIPT ERROR` inside an awaited scenario aborts only that function — the test still prints `PASS` and exits 0. Always also grep test output for `SCRIPT ERROR` (baseline is 0 in every test).
+- **Not yet confirmed on-device.**
 
 ---
 
@@ -362,7 +373,7 @@ Verification: new `scripts/tests/test_revive.gd` (unit; written red first — fa
    - Die with <50 → the button is disabled and shows your balance.
    - Run-over shows `+N` and the wallet total.
    - Close and reopen the app → the wallet persisted.
-2. **Execute the 3.4a menus plan** (`docs/superpowers/plans/2026-09-24-menus.md`, §2j) — execution method still to be chosen. Then 3.4b FTUE.
+2. **Finish 3.4a** (§2j): whole-branch review, then merge `phase-3.4a-menus`. On-device check: app opens on the title → Play; II pauses; pulling down the notification shade pauses; Back pauses/resumes in a run and quits from the title; run-over Retry/Home; Sound/Music toggles persist across an app restart; an existing wallet survives the save upgrade. Then 3.4b FTUE.
 3. **Decide on the deferred 3.1a review minors** (§2i; the version-mismatch one is resolved by 3.4a). **3.1b costume shop + shop screen** come after 3.4a and costume assets.
 4. **Phase 2 art/sound asset sourcing** — tracked in `docs/asset_list.md`; deferred to the user's own time.
 5. Phase 3.3 retention v1.
@@ -371,7 +382,7 @@ Verification: new `scripts/tests/test_revive.gd` (unit; written red first — fa
    - [x] 3.1a Treat wallet + treat revive — built, headless-verified (§2i). **Not yet confirmed on-device.**
    - [ ] 3.1b Costume shop — deferred (needs 3.4 menus + costume assets)
    - [ ] 3.3 Retention v1
-   - [ ] 3.4a Menus (title, pause, settings) — spec + plan written (§2j)
+   - [x] 3.4a Menus (title, pause, settings) — built, headless-verified (§2j). **Not merged / not confirmed on-device.**
    - [ ] 3.4b FTUE
 7. Phase 2 sub-project checklist, all code-only groundwork now done:
    - [x] #1 Difficulty ramp + minimal death state — implemented, headless-verified, committed/pushed (`2126464`). Confirmed on-device.
@@ -388,7 +399,7 @@ Verification: new `scripts/tests/test_revive.gd` (unit; written red first — fa
 
 **Reusable dev tooling now in place** (built during 1.1, applies to all future milestones):
 - Full build→deploy→test loop: `Godot_..._console.exe --headless --path "." --export-debug "Android" "builds/android/bark_and_chomp.apk"` → `adb install -r <apk>` → `adb shell am force-stop com.barkandchomp.game` → `adb shell monkey -p com.barkandchomp.game -c android.intent.category.LAUNCHER 1`.
-- In-game **Restart button** (top-right corner) reloads the current run instantly on-device — use this between playtest attempts instead of a full reinstall.
+- In-game restart is now **II (pause) → Restart** (the dev Restart button became the pause button in 3.4a); run-over also has Retry.
 - **Gotcha to remember for every new scene/UI node**: any `ColorRect`/`Label`/other `Control`-derived placeholder visual placed over gameplay area will silently eat touch input (`mouse_filter` defaults to STOP) unless `mouse_filter = 2` (IGNORE) is set explicitly. Set this on every new placeholder visual from now on, don't wait to rediscover it.
 
 Per the TDD's own instruction to coding agents: **build milestone-by-milestone, never generate the whole game in one pass — every milestone ends with a human playtest on a physical Android device.** Code-writing can and should continue ahead of the Android-SDK setup (it doesn't block editing GDScript/scenes), but no milestone is actually *done* until it's been played on a real phone.

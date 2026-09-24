@@ -21,6 +21,8 @@ func _run() -> void:
 	await _test_run_treats_only()
 	await _test_unaffordable()
 	await _test_bank_on_decline()
+	await _test_bank_on_restart_from_prompt()
+	await _test_no_double_bank_on_restart()
 	_delete_temp()
 	if ok:
 		print("PASS: treat wallet + treat revive scene")
@@ -116,6 +118,27 @@ func _test_bank_on_decline() -> void:
 	_check(save.get_wallet() == 7, "the banked wallet should be on disk")
 	await _finish(main)
 
+## Tapping Restart on the revive prompt ends the run too: this run's
+## treats must bank, not vanish with the reloaded scene.
+func _test_bank_on_restart_from_prompt() -> void:
+	var main: Node = await _start(3, 9)
+	_die(main)
+	main._on_restart_button_pressed()
+	_check(save.get_wallet() == 12, "restarting from the revive prompt should bank this run's treats (got %d)" % save.get_wallet())
+	await _finish_restarted()
+	save.reload()
+	_check(save.get_wallet() == 12, "treats banked on restart should be on disk")
+
+## Declining (banks once) then Restart must not bank the same treats again.
+func _test_no_double_bank_on_restart() -> void:
+	var main: Node = await _start(0, 7)
+	_die(main)
+	main._on_no_button_pressed()
+	main._on_no_button_pressed()
+	main._on_restart_button_pressed()
+	_check(save.get_wallet() == 7, "a run's treats must bank exactly once (got %d)" % save.get_wallet())
+	await _finish_restarted()
+
 func _check(cond: bool, msg: String) -> void:
 	if not cond:
 		push_error("FAIL: " + msg)
@@ -145,6 +168,16 @@ func _die(main: Node) -> void:
 func _finish(main: Node) -> void:
 	paused = false
 	main.queue_free()
+	await process_frame
+
+## Restart reloads the scene (deferred): let the swap happen, then free the
+## fresh scene it left behind.
+func _finish_restarted() -> void:
+	await process_frame
+	await process_frame
+	paused = false
+	if current_scene != null:
+		current_scene.queue_free()
 	await process_frame
 
 func _delete_temp() -> void:

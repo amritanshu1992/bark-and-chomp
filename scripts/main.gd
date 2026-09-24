@@ -7,6 +7,10 @@ extends Node2D
 @onready var revive_bg: ColorRect = $UI/ReviveBg
 @onready var treat_button: Button = $UI/ReviveBg/TreatButton
 
+## A run's treats bank exactly once, whichever way the run ends.
+var _run_banked := false
+var _banked_amount := 0
+
 func _ready() -> void:
 	player.died.connect(_on_player_died)
 
@@ -22,11 +26,10 @@ func _on_player_died() -> void:
 		_show_run_over()
 
 ## The run is truly over here (no revive left or it was declined), so this
-## is the one place this run's treats bank to the wallet (GDD 10.1).
+## run's treats bank to the wallet (GDD 10.1).
 func _show_run_over() -> void:
 	var distance_m: float = player.distance_traveled / player.PX_PER_UNIT
-	var banked: int = player.treats_collected
-	Save.add_treats(banked)
+	var banked := _bank_run_treats()
 	run_over_label.text = "Run over!\nDistance: %.0fm\nTreats: +%d\nWallet: %d" % [distance_m, banked, Save.get_wallet()]
 	run_over_bg.visible = true
 
@@ -73,10 +76,24 @@ func _do_revive() -> void:
 		obstacle.clear_if_on_screen()
 	player.revive()
 
+## Idempotent: returns what this run banked, adding it to the wallet only on
+## the first call.
+func _bank_run_treats() -> int:
+	if not _run_banked:
+		_run_banked = true
+		_banked_amount = player.treats_collected
+		Save.add_treats(_banked_amount)
+	return _banked_amount
+
 func _on_no_button_pressed() -> void:
+	if not revive_bg.visible:
+		return
 	revive_bg.visible = false
 	_show_run_over()
 
+## Restart ends the run too (including from the revive prompt), so bank
+## first -- otherwise the reload would silently drop this run's treats.
 func _on_restart_button_pressed() -> void:
+	_bank_run_treats()
 	get_tree().paused = false
 	get_tree().reload_current_scene()

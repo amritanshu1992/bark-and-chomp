@@ -332,6 +332,13 @@ Verification: new `scripts/tests/test_revive.gd` (unit; written red first — fa
   - No test files were left in the user-data directory, and the real `save.json` was never written.
   - Mutation check: forcing `from_run = 0` turned the scene test red, and restoring it turned it green again.
   - APK rebuilt.
+- **Final-review fix:** tapping Restart, including from the revive prompt, used to drop the run's treats silently. Banking now goes through the idempotent `_bank_run_treats()`, called from both run-over and Restart. `_on_no_button_pressed` is guarded against a second press. Two new scene scenarios cover this.
+- **Deferred review minors** (not fixed; user to decide):
+  - `save.gd::_write()` isn't atomic (no write-to-temp-then-rename), so a kill mid-write could reset the wallet.
+  - `try_spend` return value is ignored in `_on_treat_button_pressed`.
+  - **Phase 3.3 gotcha:** when `Save.VERSION` becomes 2, v1 files must be *migrated*. Today any other version resets the wallet to 0.
+  - **Phase 4.1 gotcha:** with a real async ad SDK, disable the prompt's buttons while an ad is showing, and guard `_do_revive()` so it can't run twice.
+  - The headless smoke run uses the real `user://save.json`. Today it never reaches run-over, so it never writes.
 - **Not yet confirmed on-device.**
 
 ---

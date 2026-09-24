@@ -59,6 +59,22 @@ horizontal_alignment = 1
 vertical_alignment = 1
 mouse_filter = 2
 
+[node name="RetryButton" type="Button" parent="UI/RunOverBg"]
+offset_left = 120.0
+offset_top = 900.0
+offset_right = 340.0
+offset_bottom = 1000.0
+theme_override_font_sizes/font_size = 40
+text = "Retry"
+
+[node name="HomeButton" type="Button" parent="UI/RunOverBg"]
+offset_left = 380.0
+offset_top = 900.0
+offset_right = 600.0
+offset_bottom = 1000.0
+theme_override_font_sizes/font_size = 40
+text = "Home"
+
 [node name="ReviveBg" type="ColorRect" parent="UI"]
 visible = false
 anchors_preset = 15
@@ -114,7 +130,9 @@ offset_bottom = 1000.0
 theme_override_font_sizes/font_size = 32
 text = "No"
 
-[connection signal="pressed" from="UI/RestartButton" to="." method="_on_restart_button_pressed"]
+[connection signal="pressed" from="UI/RestartButton" to="." method="restart_run"]
+[connection signal="pressed" from="UI/RunOverBg/RetryButton" to="." method="restart_run"]
+[connection signal="pressed" from="UI/RunOverBg/HomeButton" to="." method="go_home"]
 [connection signal="pressed" from="UI/ReviveBg/WatchAdButton" to="." method="_on_watch_ad_button_pressed"]
 [connection signal="pressed" from="UI/ReviveBg/NoButton" to="." method="_on_no_button_pressed"]
 [connection signal="pressed" from="UI/ReviveBg/TreatButton" to="." method="_on_treat_button_pressed"]

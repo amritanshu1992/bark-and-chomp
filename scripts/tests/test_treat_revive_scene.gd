@@ -123,7 +123,7 @@ func _test_bank_on_decline() -> void:
 func _test_bank_on_restart_from_prompt() -> void:
 	var main: Node = await _start(3, 9)
 	_die(main)
-	main._on_restart_button_pressed()
+	main.restart_run()
 	_check(save.get_wallet() == 12, "restarting from the revive prompt should bank this run's treats (got %d)" % save.get_wallet())
 	await _finish_restarted()
 	save.reload()
@@ -135,7 +135,7 @@ func _test_no_double_bank_on_restart() -> void:
 	_die(main)
 	main._on_no_button_pressed()
 	main._on_no_button_pressed()
-	main._on_restart_button_pressed()
+	main.restart_run()
 	_check(save.get_wallet() == 7, "a run's treats must bank exactly once (got %d)" % save.get_wallet())
 	await _finish_restarted()
 

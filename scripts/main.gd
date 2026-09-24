@@ -7,6 +7,8 @@ extends Node2D
 @onready var revive_bg: ColorRect = $UI/ReviveBg
 @onready var treat_button: Button = $UI/ReviveBg/TreatButton
 
+const TITLE_SCENE := "res://scenes/title.tscn"
+
 ## A run's treats bank exactly once, whichever way the run ends.
 var _run_banked := false
 var _banked_amount := 0
@@ -91,9 +93,16 @@ func _on_no_button_pressed() -> void:
 	revive_bg.visible = false
 	_show_run_over()
 
-## Restart ends the run too (including from the revive prompt), so bank
-## first -- otherwise the reload would silently drop this run's treats.
-func _on_restart_button_pressed() -> void:
+## Phase 3.4a: run-over Retry and pause-menu Restart. Leaving a run ends it
+## (including from the revive prompt), so bank first -- otherwise the reload
+## would silently drop this run's treats.
+func restart_run() -> void:
 	_bank_run_treats()
 	get_tree().paused = false
 	get_tree().reload_current_scene()
+
+## Phase 3.4a: run-over Home and pause-menu Home. Same banking rule.
+func go_home() -> void:
+	_bank_run_treats()
+	get_tree().paused = false
+	get_tree().change_scene_to_file(TITLE_SCENE)

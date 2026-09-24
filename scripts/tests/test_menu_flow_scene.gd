@@ -21,6 +21,8 @@ func _run() -> void:
 		_check(false, "%s missing" % TITLE)
 	else:
 		await _test_title()
+		await _test_run_over_retry()
+		await _test_run_over_home()
 	_delete_temp()
 	if ok:
 		print("PASS: menu flow scene")
@@ -45,6 +47,36 @@ func _test_title() -> void:
 	title.get_node("PlayButton").pressed.emit()
 	await _settle()
 	_check(current_scene != null and current_scene.scene_file_path == MAIN, "Play should start a run")
+	await _free_current()
+
+## Declining the revive banks (2 + 5); Retry starts a fresh run without
+## banking again.
+func _test_run_over_retry() -> void:
+	var main: Node = await _start_run(2, 5)
+	_die(main)
+	main._on_no_button_pressed()
+	_check(save.get_wallet() == 7, "declining should bank the run (got %d)" % save.get_wallet())
+	main.get_node("UI/RunOverBg/RetryButton").pressed.emit()
+	_check(save.get_wallet() == 7, "Retry must not bank the same run again (got %d)" % save.get_wallet())
+	await _settle()
+	_check(current_scene != null and not is_instance_valid(main) and current_scene.scene_file_path == MAIN, "Retry should reload the run")
+	_check(not paused, "Retry should leave the game unpaused")
+	await _free_current()
+
+## Home after declining: no second bank, lands on the title, and the title
+## shows the wallet including this run's treats.
+func _test_run_over_home() -> void:
+	var main: Node = await _start_run(0, 7)
+	_die(main)
+	main._on_no_button_pressed()
+	main.get_node("UI/RunOverBg/HomeButton").pressed.emit()
+	_check(save.get_wallet() == 7, "a run's treats must bank exactly once (got %d)" % save.get_wallet())
+	await _settle()
+	_check(current_scene != null and current_scene.scene_file_path == TITLE, "Home should go to the title")
+	_check(not paused, "Home should leave the game unpaused")
+	if current_scene != null and current_scene.has_node("WalletLabel"):
+		var label: Label = current_scene.get_node("WalletLabel")
+		_check(label.text == "Treats: 7", "the title should show the banked wallet (got '%s')" % label.text)
 	await _free_current()
 
 func _check(cond: bool, msg: String) -> void:

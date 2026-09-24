@@ -1,0 +1,66 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/settings.gd" id="1"]
+
+[node name="Settings" type="Control"]
+visible = false
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+script = ExtResource("1")
+
+[node name="Dim" type="ColorRect" parent="."]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+color = Color(0, 0, 0, 0.85)
+
+[node name="TitleLabel" type="Label" parent="."]
+offset_left = 40.0
+offset_top = 300.0
+offset_right = 680.0
+offset_bottom = 400.0
+mouse_filter = 2
+theme_override_font_sizes/font_size = 56
+text = "Settings"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="SoundToggle" type="CheckButton" parent="."]
+offset_left = 160.0
+offset_top = 480.0
+offset_right = 560.0
+offset_bottom = 580.0
+theme_override_font_sizes/font_size = 40
+text = "Sound"
+
+[node name="MusicToggle" type="CheckButton" parent="."]
+offset_left = 160.0
+offset_top = 600.0
+offset_right = 560.0
+offset_bottom = 700.0
+theme_override_font_sizes/font_size = 40
+text = "Music"
+
+[node name="VersionLabel" type="Label" parent="."]
+offset_left = 40.0
+offset_top = 760.0
+offset_right = 680.0
+offset_bottom = 820.0
+mouse_filter = 2
+theme_override_font_sizes/font_size = 28
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="CloseButton" type="Button" parent="."]
+offset_left = 260.0
+offset_top = 880.0
+offset_right = 460.0
+offset_bottom = 980.0
+theme_override_font_sizes/font_size = 40
+text = "Back"
+
+[connection signal="toggled" from="SoundToggle" to="." method="_on_sound_toggle_toggled"]
+[connection signal="toggled" from="MusicToggle" to="." method="_on_music_toggle_toggled"]
+[connection signal="pressed" from="CloseButton" to="." method="_on_close_button_pressed"]

@@ -8,8 +8,16 @@ extends SceneTree
 func _init() -> void:
 	_run.call_deferred()
 
+const TEMP_SAVE := "user://test_save_revive_scene.json"
+
 func _run() -> void:
 	var ok := true
+	# The Save autoload is live under -s; point it at a temp file so this
+	# test's run-over banking never touches the real user://save.json.
+	var save: Node = root.get_node("Save")
+	save.save_path = TEMP_SAVE
+	_delete_temp()
+	save.reload()
 	var main: Node = load("res://scenes/main.tscn").instantiate()
 	root.add_child(main)
 	current_scene = main
@@ -60,8 +68,13 @@ func _run() -> void:
 		ok = false
 
 	paused = false
+	_delete_temp()
 	if ok:
 		print("PASS: revive flow scene")
 	else:
 		print("FAIL: revive flow scene")
 	quit(0 if ok else 1)
+
+func _delete_temp() -> void:
+	if FileAccess.file_exists(TEMP_SAVE):
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(TEMP_SAVE))

@@ -19,9 +19,13 @@ func _on_player_died() -> void:
 	else:
 		_show_run_over()
 
+## The run is truly over here (no revive left or it was declined), so this
+## is the one place this run's treats bank to the wallet (GDD 10.1).
 func _show_run_over() -> void:
 	var distance_m: float = player.distance_traveled / player.PX_PER_UNIT
-	run_over_label.text = "Run over!\nDistance: %.0fm\nTreats: %d" % [distance_m, player.treats_collected]
+	var banked: int = player.treats_collected
+	Save.add_treats(banked)
+	run_over_label.text = "Run over!\nDistance: %.0fm\nTreats: +%d\nWallet: %d" % [distance_m, banked, Save.get_wallet()]
 	run_over_bg.visible = true
 
 func _on_watch_ad_button_pressed() -> void:

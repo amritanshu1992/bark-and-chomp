@@ -6,6 +6,7 @@ extends Node2D
 @onready var run_over_label: Label = $UI/RunOverBg/RunOverLabel
 @onready var revive_bg: ColorRect = $UI/ReviveBg
 @onready var treat_button: Button = $UI/ReviveBg/TreatButton
+@onready var pause_menu: Control = $UI/PauseMenu
 
 const TITLE_SCENE := "res://scenes/title.tscn"
 
@@ -100,6 +101,11 @@ func restart_run() -> void:
 	_bank_run_treats()
 	get_tree().paused = false
 	get_tree().reload_current_scene()
+
+## Phase 3.4a: the top-right button (the old dev Restart slot). The menu
+## itself ignores this while the revive prompt or run-over panel is up.
+func _on_pause_button_pressed() -> void:
+	pause_menu.open()
 
 ## Phase 3.4a: run-over Home and pause-menu Home. Same banking rule.
 func go_home() -> void:

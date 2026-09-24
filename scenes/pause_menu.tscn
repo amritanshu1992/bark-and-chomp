@@ -1,0 +1,69 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/pause_menu.gd" id="1"]
+[ext_resource type="PackedScene" path="res://scenes/settings.tscn" id="2"]
+
+[node name="PauseMenu" type="Control"]
+visible = false
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+script = ExtResource("1")
+
+[node name="Dim" type="ColorRect" parent="."]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+color = Color(0, 0, 0, 0.7)
+
+[node name="TitleLabel" type="Label" parent="."]
+offset_left = 40.0
+offset_top = 300.0
+offset_right = 680.0
+offset_bottom = 400.0
+mouse_filter = 2
+theme_override_font_sizes/font_size = 56
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+text = "Paused"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="ResumeButton" type="Button" parent="."]
+offset_left = 160.0
+offset_top = 440.0
+offset_right = 560.0
+offset_bottom = 540.0
+theme_override_font_sizes/font_size = 40
+text = "Resume"
+
+[node name="RestartButton" type="Button" parent="."]
+offset_left = 160.0
+offset_top = 580.0
+offset_right = 560.0
+offset_bottom = 680.0
+theme_override_font_sizes/font_size = 40
+text = "Restart"
+
+[node name="SettingsButton" type="Button" parent="."]
+offset_left = 160.0
+offset_top = 720.0
+offset_right = 560.0
+offset_bottom = 820.0
+theme_override_font_sizes/font_size = 40
+text = "Settings"
+
+[node name="HomeButton" type="Button" parent="."]
+offset_left = 160.0
+offset_top = 860.0
+offset_right = 560.0
+offset_bottom = 960.0
+theme_override_font_sizes/font_size = 40
+text = "Home"
+
+[node name="Settings" parent="." instance=ExtResource("2")]
+
+[connection signal="pressed" from="ResumeButton" to="." method="_on_resume_button_pressed"]
+[connection signal="pressed" from="RestartButton" to="." method="_on_restart_button_pressed"]
+[connection signal="pressed" from="SettingsButton" to="." method="_on_settings_button_pressed"]
+[connection signal="pressed" from="HomeButton" to="." method="_on_home_button_pressed"]

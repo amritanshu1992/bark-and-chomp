@@ -1,4 +1,4 @@
-[gd_scene load_steps=5 format=3]
+[gd_scene load_steps=8 format=3]
 
 [ext_resource type="PackedScene" path="res://scenes/player.tscn" id="1"]
 [ext_resource type="PackedScene" path="res://scenes/obstacle.tscn" id="2"]
@@ -6,6 +6,7 @@
 [ext_resource type="PackedScene" path="res://scenes/rival.tscn" id="4"]
 [ext_resource type="Script" path="res://scripts/treat_spawner.gd" id="5"]
 [ext_resource type="Script" path="res://scripts/lane_scroll.gd" id="6"]
+[ext_resource type="PackedScene" path="res://scenes/pause_menu.tscn" id="7"]
 
 [node name="Main" type="Node2D"]
 script = ExtResource("3")
@@ -28,7 +29,7 @@ script = ExtResource("5")
 [node name="UI" type="CanvasLayer" parent="."]
 process_mode = 3
 
-[node name="RestartButton" type="Button" parent="UI"]
+[node name="PauseButton" type="Button" parent="UI"]
 anchors_preset = 1
 anchor_left = 1.0
 anchor_right = 1.0
@@ -37,7 +38,7 @@ offset_top = 20.0
 offset_right = -20.0
 offset_bottom = 80.0
 grow_horizontal = 0
-text = "Restart"
+text = "II"
 
 [node name="RunOverBg" type="ColorRect" parent="UI"]
 visible = false
@@ -130,7 +131,11 @@ offset_bottom = 1000.0
 theme_override_font_sizes/font_size = 32
 text = "No"
 
-[connection signal="pressed" from="UI/RestartButton" to="." method="restart_run"]
+[node name="PauseMenu" parent="UI" instance=ExtResource("7")]
+
+[connection signal="pressed" from="UI/PauseButton" to="." method="_on_pause_button_pressed"]
+[connection signal="restart_requested" from="UI/PauseMenu" to="." method="restart_run"]
+[connection signal="home_requested" from="UI/PauseMenu" to="." method="go_home"]
 [connection signal="pressed" from="UI/RunOverBg/RetryButton" to="." method="restart_run"]
 [connection signal="pressed" from="UI/RunOverBg/HomeButton" to="." method="go_home"]
 [connection signal="pressed" from="UI/ReviveBg/WatchAdButton" to="." method="_on_watch_ad_button_pressed"]

@@ -1,6 +1,6 @@
 # Handoff — "Bark & Chomp"
 
-Last updated: 2026-09-24 (session 11 — Phase 3.2 revive flow and Phase 3.1a treat wallet + treat revive both built and headless-verified; neither confirmed on-device yet. 3.1a is on branch `phase-3.1a-treat-wallet`, not merged)
+Last updated: 2026-09-24 (session 11 — Phase 3.2 revive flow and Phase 3.1a treat wallet + treat revive both built and headless-verified; neither confirmed on-device yet. 3.1a reviewed (opus final review, one Important fix), merged to main and pushed)
 
 Purpose: read this first at the start of a new session to pick up exactly where things left off. It is a living doc — update it at the end of each session.
 
@@ -313,7 +313,7 @@ Verification: new `scripts/tests/test_revive.gd` (unit; written red first — fa
 ## 2i. Phase 3.1 planning — split into 3.1a / 3.1b (session 11, 2026-09-24)
 
 **Divergence from `bark_and_chomp_project_plan.md` §3.1**: the plan bundles the treat wallet with the costume shop. Split, by user decision:
-- **3.1a — treat wallet + treat revive** (spec: `docs/superpowers/specs/2026-09-24-treat-wallet-design.md`; plan: `docs/superpowers/plans/2026-09-24-treat-wallet.md`). **Built** on branch `phase-3.1a-treat-wallet` — see "What was built" below.
+- **3.1a — treat wallet + treat revive** (spec: `docs/superpowers/specs/2026-09-24-treat-wallet-design.md`; plan: `docs/superpowers/plans/2026-09-24-treat-wallet.md`). **Built** and merged to main — see "What was built" below.
 - **3.1b — costume shop**, deferred until menus (3.4) exist and costume art/bark SFX are sourced (GDD §9.5 costume rule can't be met with placeholders).
 
 3.1a decisions: `Save` **autoload** (`scripts/save.gd`, JSON `user://save.json`, `{"version":1,"wallet":N}`) — first autoload in the project, justified because it's stateful and must survive `reload_current_scene()`; treats bank once at true run end (`_show_run_over`); [50 treats] revive spends **this run's treats first, then wallet**; button shown **disabled with balance** when unaffordable. Chomp treat payout, HUD wallet, best distance all out of scope.
@@ -351,7 +351,7 @@ Verification: new `scripts/tests/test_revive.gd` (unit; written red first — fa
    - Die with <50 → the button is disabled and shows your balance.
    - Run-over shows `+N` and the wallet total.
    - Close and reopen the app → the wallet persisted.
-2. **Merge `phase-3.1a-treat-wallet` to main** once reviewed. **3.1b costume shop** comes after menus (3.4) and costume assets.
+2. **Decide on the deferred 3.1a review minors** (§2i). **3.1b costume shop** comes after menus (3.4) and costume assets.
 3. **Phase 2 art/sound asset sourcing** — tracked in `docs/asset_list.md`; deferred to the user's own time.
 4. Phase 3.3 retention v1, 3.4 menus & FTUE.
 5. Phase 3 checklist:

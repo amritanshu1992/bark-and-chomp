@@ -1,6 +1,6 @@
 # Handoff — "Bark & Chomp"
 
-Last updated: 2026-09-24 (session 12 — Phase 3.4a menus (title, pause menu + auto-pause + Back, Settings, run-over Retry/Home, save v2) built, final-reviewed (opus, fixes applied) and **merged to `main`** locally (not pushed); not confirmed on-device. Revive + wallet also still not confirmed on-device)
+Last updated: 2026-09-24 (session 12 — Phase 3.4a menus built, final-reviewed (opus, fixes applied), merged to `main` locally (not pushed) and **confirmed on-device** by the user (everything works; sound can't be heard because no audio files exist yet). 50-treat revive and wallet persistence also confirmed on-device. Next: 3.4b FTUE)
 
 Purpose: read this first at the start of a new session to pick up exactly where things left off. It is a living doc — update it at the end of each session.
 
@@ -364,28 +364,23 @@ Verification: new `scripts/tests/test_revive.gd` (unit; written red first — fa
 - `scenes/pause_menu.tscn` + `scripts/pause_menu.gd` — Resume/Restart/Settings/Home; opens on II, app focus loss, or Back; `open()` is a no-op while already paused.
 - Tests: `test_save.gd` extended; new `test_settings.gd`, `test_menu_flow_scene.gd` (9 scenarios); `test_treat_revive_scene.gd` calls `restart_run()`. All 10 tests pass, both smoke runs (title and `main.tscn`) clean, APK rebuilt.
 - **Test-harness gotcha found**: a `SCRIPT ERROR` inside an awaited scenario aborts only that function — the test still prints `PASS` and exits 0. Always also grep test output for `SCRIPT ERROR` (baseline is 0 in every test).
-- **Not yet confirmed on-device.**
+- **Confirmed on-device** by the user (session 12): title, II/shade/Back pause, Restart/Home, Retry, settings persistence, wallet upgrade all work. Sound can't be heard (no audio assets).
 
 ---
 
 ## 3. What's next (in order)
 
-1. **Install this session's APK and confirm the revive flow *and* the treat wallet on-device**:
-   - Die once → prompt appears → Watch Ad resumes with a blink and nothing on screen hits you; die again → run-over. Judge whether 1.5s grace feels right.
-   - Die with ≥50 treats available (wallet + this run) → `[50 treats]` is enabled → the revive works.
-   - Die with <50 → the button is disabled and shows your balance.
-   - Run-over shows `+N` and the wallet total.
-   - Close and reopen the app → the wallet persisted.
-2. **3.4a is merged to `main`** (§2j; not pushed). On-device check still needed: app opens on the title → Play; II pauses; pulling down the notification shade pauses; Back pauses/resumes in a run and quits from the title; run-over Retry/Home; Sound/Music toggles persist across an app restart (visual check only -- the game has **no audio files yet**, so muting can't be heard; settings overlay ghosting already fixed and confirmed on device); an existing wallet survives the save upgrade. Then 3.4b FTUE.
+1. **Plan 3.4b — first-run tutorial (FTUE)**: teach hop, bark, deflect in safe moments; replaces the Round-4 one-time bark hint (see §2j scope split). Start with brainstorming.
+2. **Leftover on-device checks** (not explicitly covered in the session-12 walkthrough): Watch Ad revive feel (is 1.5s grace right?), `[50 treats]` disabled-with-balance when <50.
 3. **Decide on the deferred 3.1a review minors** (§2i; the version-mismatch one is resolved by 3.4a). **3.1b costume shop + shop screen** come after 3.4a and costume assets.
 4. **Phase 2 art/sound asset sourcing** — tracked in `docs/asset_list.md`; deferred to the user's own time.
 5. Phase 3.3 retention v1.
 6. Phase 3 checklist:
    - [x] 3.2 Revive flow — built, headless-verified (§2h). **Not yet confirmed on-device.** Treat-cost option deferred to 3.1.
-   - [x] 3.1a Treat wallet + treat revive — built, headless-verified (§2i). **Not yet confirmed on-device.**
+   - [x] 3.1a Treat wallet + treat revive — built, headless-verified (§2i). Confirmed on-device (session 12): 50-treat revive and wallet persistence work.
    - [ ] 3.1b Costume shop — deferred (needs 3.4 menus + costume assets)
    - [ ] 3.3 Retention v1
-   - [x] 3.4a Menus (title, pause, settings) — built, reviewed, merged to `main` (§2j). **Not confirmed on-device.**
+   - [x] 3.4a Menus (title, pause, settings) — built, reviewed, merged to `main`, **confirmed on-device** (§2j).
    - [ ] 3.4b FTUE
 7. Phase 2 sub-project checklist, all code-only groundwork now done:
    - [x] #1 Difficulty ramp + minimal death state — implemented, headless-verified, committed/pushed (`2126464`). Confirmed on-device.

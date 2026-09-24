@@ -1,6 +1,6 @@
 # Handoff — "Bark & Chomp"
 
-Last updated: 2026-08-23 (session 9 — Milestone 1.6 GO/NO-GO gate passed via 3-tester in-person playtest; Phase 2 #4 juice built; three playtest-driven fixes built: bark-hint Continue button, eased charge/release squash tween, widened throw telegraph for reaction time)
+Last updated: 2026-08-27 (session 10 — on-device verification of Phase 2 groundwork (juice, continue button, eased squash tween, reaction time) confirmed on a Samsung Galaxy S24 Ultra; Phase 2 code-only sub-projects complete; committing changes to main)
 
 Purpose: read this first at the start of a new session to pick up exactly where things left off. It is a living doc — update it at the end of each session.
 
@@ -290,23 +290,24 @@ Brainstormed as **Bounded**. Explored first: confirmed a completely clean slate 
 
 **Verification this session**: full headless test suite (`test_hit_tracking`, `test_get_track_y`, `test_audio_scaffolding`, `test_juice`) all pass. Full headless smoke run of `main.tscn` — zero script/parse errors (only expected shutdown noise from the `timeout` kill and pre-existing RID-leak teardown warnings unrelated to this change). APK rebuilt (`--export-debug "Android"`) successfully.
 
-**Not yet confirmed on-device** — the phone was disconnected from the dev machine during the user's in-person 3-tester playtest and has not been reconnected yet this session. Next session (or later this session if the user reconnects it): `adb install -r` + force-stop + monkey launch + logcat check, covering both the juice feature (never yet confirmed on-device at all) and these three fixes together in one build. This is the fifth rebuild this session.
+**Confirmed on-device** — user tested on Samsung Galaxy S24 Ultra and confirmed the game feels good. This validates the Juice mechanics (hit-stop, camera shake, particle bursts), the Continue button under pause, the eased scale tween, and the 1.0s throw telegraph timing.
 
-**Not yet committed to git** — none of this session's work (juice files, the three fixes, this handoff update) has been committed yet.
+**Committed and pushed to main** — session 9 code/tests landed in `497e1d9`; session 10's handoff update committed separately. Next up: Phase 3.2 Revive flow (chosen first — smallest slice, builds on the existing death state, and Phase 4.1 rewarded ads plug into it later), then 3.1 wallet.
 
 ---
 
 ## 3. What's next (in order)
 
-1. **Reconnect the test device and confirm this session's build on-device**, then update this doc to mark that confirmed. Watch specifically for: hit-stop/shake/particle bursts feeling right (never seen on-device before), the new Continue button working correctly while paused, the charge/release squash reading as smooth now, and whether the widened throw-telegraph genuinely gives enough reaction time.
-2. Commit and push this session's work (see §2g) once the on-device check is clean.
-3. Phase 2 art/sound asset sourcing — tracked as an actionable checklist in `docs/asset_list.md` (source: GDD §9.2-9.4 / plan §2.1-2.2); nothing sourced yet, deferred to the user's own time. All 4 Phase 2 code-only sub-projects (difficulty ramp, animation scaffolding, audio scaffolding, juice) are now done — real assets are the remaining Phase 2 work.
-4. Phase 2 sub-project checklist, all code-only groundwork now done:
+1. [x] Reconnect the test device and confirm this session's build on-device.
+2. [x] Commit and push this session's work once the on-device check is clean.
+3. **Phase 2 art/sound asset sourcing** — tracked as an actionable checklist in `docs/asset_list.md`. Sourcing of high-quality assets is deferred to the user's own time.
+4. **Phase 3 — Game Systems**: Proceed to implementing Phase 3.1 (Meta & economy) and Phase 3.2 (Revive flow) using placeholder UI and assets. This includes setting up the treat wallet, costume shop structure (with sample placeholder costumes), and daily login bonus or local high score systems.
+5. Phase 2 sub-project checklist, all code-only groundwork now done:
    - [x] #1 Difficulty ramp + minimal death state — implemented, headless-verified, committed/pushed (`2126464`). Confirmed on-device.
    - [x] #2 Animation scaffolding — confirmed on-device.
    - [x] #3 Audio scaffolding — headless-verified; nothing audible to confirm by design (silent scaffolding).
-   - [x] #4 Juice — hit-stop, screen shake, particle bursts. Headless-verified this session (§2g). **Not yet confirmed on-device.**
-5. Phase 1 ("The Ugly Capsule" prototype) status, per `bark_and_chomp_project_plan.md` §PHASE 1 — **all complete**:
+   - [x] #4 Juice — hit-stop, screen shake, particle bursts. Confirmed on-device.
+6. Phase 1 ("The Ugly Capsule" prototype) status, per `bark_and_chomp_project_plan.md` §PHASE 1 — **all complete**:
    - [x] 1.1 Movement — confirmed working on-device.
    - [x] 1.2 Bark input state machine — confirmed working on-device.
    - [x] 1.3 Projectile + deflect — confirmed working on-device.

@@ -51,5 +51,8 @@ extends Resource
 @export var hits_to_die := 3            # projectile hits and un-hopped obstacles count equally
 @export var hit_window_s := 8.0         # rolling window -- hits older than this don't count toward death
 
+# Revive (Phase 3.2)
+@export var revive_grace_s := 1.5       # post-revive invincibility window -- initial guess, tune after playtesting
+
 # Economy (Phase 3)
 @export var revive_cost_treats := 50

@@ -1,6 +1,6 @@
 # Handoff — "Bark & Chomp"
 
-Last updated: 2026-08-27 (session 10 — on-device verification of Phase 2 groundwork (juice, continue button, eased squash tween, reaction time) confirmed on a Samsung Galaxy S24 Ultra; Phase 2 code-only sub-projects complete; committing changes to main)
+Last updated: 2026-09-24 (session 11 — Phase 3.2 revive flow built and headless-verified; not yet confirmed on-device; graphify knowledge graph of the docs generated in `graphify-out/`, untracked)
 
 Purpose: read this first at the start of a new session to pick up exactly where things left off. It is a living doc — update it at the end of each session.
 
@@ -294,20 +294,41 @@ Brainstormed as **Bounded**. Explored first: confirmed a completely clean slate 
 
 **Committed and pushed to main** — session 9 code/tests landed in `497e1d9`; session 10's handoff update committed separately. Next up: Phase 3.2 Revive flow (chosen first — smallest slice, builds on the existing death state, and Phase 4.1 rewarded ads plug into it later), then 3.1 wallet.
 
+## 2h. Phase 3.2 — Revive flow (session 11, 2026-09-24)
+
+Brainstormed as **Bounded** (extends the existing death → run-over flow; no `GameManager` autoload — the TDD's run-lifecycle state machine stays future work). User decisions:
+- **No [50 treats] button yet** — there's no wallet until 3.1. Revive prompt shows only **[Watch Ad]** / **[No]**; add the treat option when 3.1 lands (`tuning.revive_cost_treats` already exists, unused).
+- **Post-revive safety = clear on-screen hazards + grace invincibility** (not grace-only, not clear-only).
+
+What was built:
+- `scripts/ad_service.gd` — `class_name AdService`, static `show_rewarded(slot, on_success)`; Phase 1–3 stub calls `on_success` immediately. Phase 4.1 replaces only this body. Static-only like `juice.gd`, no autoload.
+- `player.gd` — `can_offer_revive()` (one per run), pure `begin_revive_grace()` (clears `_is_dead`, `_hit_times`, sets `_revive_used`, starts `tuning.revive_grace_s`=1.5s — initial guess) + `tick_revive_grace(delta)`, and scene-touching `revive()` (plays "run", unpauses). `is_invincible()` now = Zoomies **or** grace, so obstacle/projectile code needed no change. Blink during grace toggles `visual.visible` (not modulate, so it can't fight AnimationPlayer modulate tracks). `_register_hit_and_maybe_die()` also early-outs while invincible. New `get_offscreen_top_y()` mirrors `get_offscreen_bottom_y()`.
+- `projectile.gd` `cancel()` (puff + return to pool), `rival_base.gd` `clear_hazards()` (cancels all in-flight projectiles; rerolls throw timer if CHASING), `obstacle.gd` `clear_if_on_screen()` (unresolved + below viewport top → puff + free).
+- `main.gd` — first death shows `UI/ReviveBg` (grey placeholder "sad dog" square, "Give a Treat to Revive?", Watch Ad / No); Watch Ad → `AdService` → clear hazards → `player.revive()`; No or second death → existing run-over screen.
+- **Gotcha**: rival's throw-telegraph timer (`create_timer` default `process_always=true`) keeps running while paused, so a throw can launch while the revive prompt is up. Harmless because `clear_hazards()` runs after the ad, but worth knowing for any future pause-driven state.
+- **Gotcha**: `tuning.gd`, `player.gd`, `obstacle.gd`, `rival_base.gd`, `projectile.gd`, `main.tscn` are all CRLF (only `main.gd` is LF) — the CRLF issue noted in §2g is wider than just `projectile.gd`.
+
+Verification: new `scripts/tests/test_revive.gd` (unit; written red first — failed on missing `ad_service.gd`/`revive_grace_s` — then green) and `scripts/tests/test_revive_scene.gd` (integration through real `main.tscn`: die → prompt → Watch Ad → unpaused, invincible, projectiles cleared → grace expires → second death goes straight to run-over; mutation-checked by removing `clear_hazards()`, test went red). All 7 headless tests pass; headless smoke run clean; APK rebuilt. **Not yet confirmed on-device** — no device attached this session.
+
 ---
 
 ## 3. What's next (in order)
 
-1. [x] Reconnect the test device and confirm this session's build on-device.
-2. [x] Commit and push this session's work once the on-device check is clean.
-3. **Phase 2 art/sound asset sourcing** — tracked as an actionable checklist in `docs/asset_list.md`. Sourcing of high-quality assets is deferred to the user's own time.
-4. **Phase 3 — Game Systems**: Proceed to implementing Phase 3.1 (Meta & economy) and Phase 3.2 (Revive flow) using placeholder UI and assets. This includes setting up the treat wallet, costume shop structure (with sample placeholder costumes), and daily login bonus or local high score systems.
-5. Phase 2 sub-project checklist, all code-only groundwork now done:
+1. **Install this session's APK and confirm the revive flow on-device**: die once → prompt appears → Watch Ad resumes with a blink, nothing on screen hits you; die again → run-over. Judge whether 1.5s grace feels right.
+2. **Phase 3.1 — Meta & economy**: treat wallet (run treats bank at death), then add the [50 treats] revive button, then costume shop.
+3. **Phase 2 art/sound asset sourcing** — tracked in `docs/asset_list.md`; deferred to the user's own time.
+4. Phase 3.3 retention v1, 3.4 menus & FTUE.
+5. Phase 3 checklist:
+   - [x] 3.2 Revive flow — built, headless-verified (§2h). **Not yet confirmed on-device.** Treat-cost option deferred to 3.1.
+   - [ ] 3.1 Meta & economy
+   - [ ] 3.3 Retention v1
+   - [ ] 3.4 Menus & FTUE
+6. Phase 2 sub-project checklist, all code-only groundwork now done:
    - [x] #1 Difficulty ramp + minimal death state — implemented, headless-verified, committed/pushed (`2126464`). Confirmed on-device.
    - [x] #2 Animation scaffolding — confirmed on-device.
    - [x] #3 Audio scaffolding — headless-verified; nothing audible to confirm by design (silent scaffolding).
    - [x] #4 Juice — hit-stop, screen shake, particle bursts. Confirmed on-device.
-6. Phase 1 ("The Ugly Capsule" prototype) status, per `bark_and_chomp_project_plan.md` §PHASE 1 — **all complete**:
+7. Phase 1 ("The Ugly Capsule" prototype) status, per `bark_and_chomp_project_plan.md` §PHASE 1 — **all complete**:
    - [x] 1.1 Movement — confirmed working on-device.
    - [x] 1.2 Bark input state machine — confirmed working on-device.
    - [x] 1.3 Projectile + deflect — confirmed working on-device.

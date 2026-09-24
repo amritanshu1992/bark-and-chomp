@@ -27,6 +27,9 @@ const LANE_X := 360.0
 
 var _resolved: bool = false
 
+const CLEAR_BURST_COLOR := Color(0.85, 0.85, 0.85)
+const CLEAR_BURST_COUNT := 8
+
 func _ready() -> void:
 	global_position = Vector2(LANE_X, _player.get_track_y(target_progress))
 
@@ -53,3 +56,12 @@ func _physics_process(_delta: float) -> void:
 			_player.on_obstacle_cleared()
 	elif _player.has_method("on_obstacle_hit"):
 		_player.on_obstacle_hit()
+
+## Phase 3.2 revive: removes this obstacle if it's unresolved and already on
+## screen (below the viewport's top edge). One further up is left alone --
+## the dog will see it coming well after the grace window.
+func clear_if_on_screen() -> void:
+	if _resolved or global_position.y < _player.get_offscreen_top_y():
+		return
+	Juice.spawn_burst(get_tree().current_scene, global_position, CLEAR_BURST_COLOR, CLEAR_BURST_COUNT)
+	queue_free()

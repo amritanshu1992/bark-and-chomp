@@ -34,6 +34,9 @@ var _progress: float = 0.0
 var _progress_velocity: float = 0.0
 var deflected: bool = false
 var _age: float = 0.0
+
+const CANCEL_BURST_COLOR := Color(0.85, 0.85, 0.85)
+const CANCEL_BURST_COUNT := 8
 var _player: Node2D
 
 @onready var visual: ColorRect = $Visual
@@ -100,6 +103,14 @@ func _on_body_entered(body: Node2D) -> void:
 		return
 	if body.has_method("on_projectile_hit"):
 		body.on_projectile_hit()
+	_return_to_pool()
+
+## Phase 3.2 revive: removes an in-flight projectile with a small puff so
+## the dog doesn't resume straight into it. No-op if already pooled.
+func cancel() -> void:
+	if not visible:
+		return
+	Juice.spawn_burst(get_tree().current_scene, global_position, CANCEL_BURST_COLOR, CANCEL_BURST_COUNT)
 	_return_to_pool()
 
 func _return_to_pool() -> void:

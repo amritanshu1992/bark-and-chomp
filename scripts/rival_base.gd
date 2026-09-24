@@ -219,6 +219,17 @@ func _throw_projectile() -> void:
 	var p: Area2D = _pool.pop_back()
 	p.launch(_progress, tuning.projectile_speed * PX_PER_UNIT, player)
 
+## Phase 3.2 revive: clears every in-flight projectile (including one thrown
+## by a telegraph that finished while the revive prompt was up -- that timer
+## ignores pause) and, if just chasing, rerolls the throw timer so the next
+## attack isn't instant.
+func clear_hazards() -> void:
+	for child in get_children():
+		if child.has_method("cancel"):
+			child.cancel()
+	if _state == State.CHASING:
+		_reroll_throw_timer()
+
 func _on_projectile_returned(p: Area2D) -> void:
 	_pool.append(p)
 

@@ -38,6 +38,7 @@ const RELEASE_UNSQUASH_S := 0.15
 const METER_BAR_MAX_WIDTH := 260.0
 const TREAT_BURST_COLOR := Color(0.95, 0.85, 0.2)
 const TREAT_BURST_COUNT := 10
+const REVIVE_BLINK_PERIOD_S := 0.2
 
 @export var tuning: Tuning = preload("res://resources/tuning.tres")
 
@@ -71,6 +72,8 @@ var _run_time_elapsed: float = 0.0
 var treats_collected: int = 0
 var _hit_times: Array[float] = []
 var _is_dead: bool = false
+var _revive_used: bool = false
+var _revive_grace_left: float = 0.0
 var _shake_time_left: float = 0.0
 var _shake_duration_s: float = 0.0
 var _shake_amount_px: float = 0.0
@@ -229,6 +232,11 @@ func get_track_y(progress: float) -> float:
 func get_offscreen_bottom_y() -> float:
 	return BASELINE_Y - CAMERA_Y_OFFSET_PX + get_viewport_rect().size.y / 2.0
 
+## World Y of the top edge of the viewport -- mirror of
+## get_offscreen_bottom_y(). Anything below this is visible on screen.
+func get_offscreen_top_y() -> float:
+	return BASELINE_Y - CAMERA_Y_OFFSET_PX - get_viewport_rect().size.y / 2.0
+
 ## How far through the speed ramp the run currently is (0 at start, 1 once
 ## run_speed_ramp_s has elapsed). Also drives the rival's throw-frequency
 ## ramp (rival_base.gd) -- one shared difficulty curve for the whole run.
@@ -285,6 +293,11 @@ func _physics_process(delta: float) -> void:
 		_zoomies_time_left -= delta
 		if _zoomies_time_left <= 0.0:
 			_end_zoomies()
+
+	tick_revive_grace(delta)
+	# Placeholder post-revive blink -- toggles visibility rather than
+	# modulate so it can't fight the AnimationPlayer's modulate tracks.
+	visual.visible = _revive_grace_left <= 0.0 or fmod(_revive_grace_left, REVIVE_BLINK_PERIOD_S) < REVIVE_BLINK_PERIOD_S / 2.0
 
 func _on_hop_requested() -> void:
 	if hop_offset <= 0.0 and hop_velocity == 0.0:
@@ -397,7 +410,7 @@ func is_zoomies_active() -> bool:
 	return zoomies_active
 
 func is_invincible() -> bool:
-	return zoomies_active
+	return zoomies_active or _revive_grace_left > 0.0
 
 ## Whether the player is currently airborne enough for a hop to count as
 ## clearing an obstacle/treat. Deliberately not raw shape-overlap physics
@@ -446,7 +459,7 @@ func register_hit(now_s: float) -> bool:
 	return _hit_times.size() >= tuning.hits_to_die
 
 func _register_hit_and_maybe_die() -> void:
-	if _is_dead:
+	if _is_dead or is_invincible():
 		return
 	if register_hit(_run_time_elapsed):
 		_is_dead = true
@@ -455,6 +468,31 @@ func _register_hit_and_maybe_die() -> void:
 		get_tree().paused = true
 	else:
 		_play_anim("hit")
+
+## Phase 3.2 revive: one per run (GDD 6.4). Split into pure state
+## (begin_revive_grace/tick_revive_grace, unit-tested in
+## scripts/tests/test_revive.gd) and revive(), which also touches the scene.
+func can_offer_revive() -> bool:
+	return not _revive_used
+
+## Clears the rolling hit window too -- otherwise the hits that just killed
+## the dog would still count and the next single hit would re-kill it.
+func begin_revive_grace() -> void:
+	_is_dead = false
+	_revive_used = true
+	_hit_times.clear()
+	_revive_grace_left = tuning.revive_grace_s
+
+func tick_revive_grace(delta: float) -> void:
+	_revive_grace_left = maxf(0.0, _revive_grace_left - delta)
+
+## Called by main.gd once the rewarded ad succeeds. Hazard clearing lives
+## with the hazards themselves (rival_base.gd/obstacle.gd); main.gd
+## orchestrates. Unpauses last so nothing ticks mid-reset.
+func revive() -> void:
+	begin_revive_grace()
+	_play_anim("run")
+	get_tree().paused = false
 
 func _update_meter_bar() -> void:
 	var ratio := clampf(meter / tuning.meter_max, 0.0, 1.0)

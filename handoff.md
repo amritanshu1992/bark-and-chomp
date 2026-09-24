@@ -1,6 +1,6 @@
 # Handoff — "Bark & Chomp"
 
-Last updated: 2026-09-24 (session 11 — Phase 3.2 revive flow built, headless-verified and pushed (`84a6943`); not yet confirmed on-device. Phase 3.1 split into 3.1a/3.1b; 3.1a treat-wallet spec written, awaiting user review. graphify output now gitignored)
+Last updated: 2026-09-24 (session 11 — Phase 3.2 revive flow and Phase 3.1a treat wallet + treat revive both built and headless-verified; neither confirmed on-device yet. 3.1a is on branch `phase-3.1a-treat-wallet`, not merged)
 
 Purpose: read this first at the start of a new session to pick up exactly where things left off. It is a living doc — update it at the end of each session.
 
@@ -313,23 +313,43 @@ Verification: new `scripts/tests/test_revive.gd` (unit; written red first — fa
 ## 2i. Phase 3.1 planning — split into 3.1a / 3.1b (session 11, 2026-09-24)
 
 **Divergence from `bark_and_chomp_project_plan.md` §3.1**: the plan bundles the treat wallet with the costume shop. Split, by user decision:
-- **3.1a — treat wallet + treat revive** (spec: `docs/superpowers/specs/2026-09-24-treat-wallet-design.md`, written, **awaiting user review** → then writing-plans).
+- **3.1a — treat wallet + treat revive** (spec: `docs/superpowers/specs/2026-09-24-treat-wallet-design.md`; plan: `docs/superpowers/plans/2026-09-24-treat-wallet.md`). **Built** on branch `phase-3.1a-treat-wallet` — see "What was built" below.
 - **3.1b — costume shop**, deferred until menus (3.4) exist and costume art/bark SFX are sourced (GDD §9.5 costume rule can't be met with placeholders).
 
 3.1a decisions: `Save` **autoload** (`scripts/save.gd`, JSON `user://save.json`, `{"version":1,"wallet":N}`) — first autoload in the project, justified because it's stateful and must survive `reload_current_scene()`; treats bank once at true run end (`_show_run_over`); [50 treats] revive spends **this run's treats first, then wallet**; button shown **disabled with balance** when unaffordable. Chomp treat payout, HUD wallet, best distance all out of scope.
 - **Verified gotcha**: Godot 4.7.1 **does** instantiate autoloads (and run `_ready()`) under headless `-s` test scripts — so any scene test must redirect `Save.save_path` to a temp file and `Save.reload()` before loading `main.tscn`, or it will write the real save.
 
+**3.1a — what was built** (branch `phase-3.1a-treat-wallet`, commits `a0bb1dd`, `158889a`, `ba3ec4f`):
+- `scripts/save.gd` registered as the `Save` autoload in `project.godot` (first autoload in the project). `get_wallet()`, `add_treats(n)`, `try_spend(n) -> bool`, `reload()`; writes the whole file on every change; a missing, corrupt, wrong-version, negative, fractional or non-numeric save falls back to wallet 0 with a `push_warning`, never a crash.
+- Banking: `main.gd::_show_run_over()` adds this run's treats to the wallet. The run-over label now reads `Run over! / Distance / Treats: +N / Wallet: M`.
+- `UI/ReviveBg/TreatButton` sits between Watch Ad and No; `NoButton` moved down to y 930–1000. `_refresh_treat_button()` runs when the prompt opens and shows the button disabled with `(you have N)` if unaffordable. `_on_treat_button_pressed()` spends this run's treats first, then the wallet, and is guarded against a second press and an unaffordable press. The old `_on_revive_ad_success()` became `_do_revive()`, shared by both revive paths.
+- Tests:
+  - New `test_save.gd` (unit: persistence, overspend, negatives, and 7 malformed-file cases).
+  - New `test_treat_revive_scene.gd` (5 scenarios through the real `main.tscn`: mixed spend and double press, exact cost, run treats only, unaffordable, bank on decline).
+  - `test_revive_scene.gd` now points `Save` at a temp file.
+- Verification:
+  - All 8 headless tests pass and the smoke run is clean.
+  - No test files were left in the user-data directory, and the real `save.json` was never written.
+  - Mutation check: forcing `from_run = 0` turned the scene test red, and restoring it turned it green again.
+  - APK rebuilt.
+- **Not yet confirmed on-device.**
+
 ---
 
 ## 3. What's next (in order)
 
-1. **Install this session's APK and confirm the revive flow on-device**: die once → prompt appears → Watch Ad resumes with a blink, nothing on screen hits you; die again → run-over. Judge whether 1.5s grace feels right.
-2. **Phase 3.1a — treat wallet + treat revive**: user reviews the spec (§2i), then writing-plans, then implement. **3.1b costume shop** after menus (3.4) + costume assets.
+1. **Install this session's APK and confirm the revive flow *and* the treat wallet on-device**:
+   - Die once → prompt appears → Watch Ad resumes with a blink and nothing on screen hits you; die again → run-over. Judge whether 1.5s grace feels right.
+   - Die with ≥50 treats available (wallet + this run) → `[50 treats]` is enabled → the revive works.
+   - Die with <50 → the button is disabled and shows your balance.
+   - Run-over shows `+N` and the wallet total.
+   - Close and reopen the app → the wallet persisted.
+2. **Merge `phase-3.1a-treat-wallet` to main** once reviewed. **3.1b costume shop** comes after menus (3.4) and costume assets.
 3. **Phase 2 art/sound asset sourcing** — tracked in `docs/asset_list.md`; deferred to the user's own time.
 4. Phase 3.3 retention v1, 3.4 menus & FTUE.
 5. Phase 3 checklist:
    - [x] 3.2 Revive flow — built, headless-verified (§2h). **Not yet confirmed on-device.** Treat-cost option deferred to 3.1.
-   - [ ] 3.1a Treat wallet + treat revive — spec written (§2i), awaiting review
+   - [x] 3.1a Treat wallet + treat revive — built, headless-verified (§2i). **Not yet confirmed on-device.**
    - [ ] 3.1b Costume shop — deferred (needs 3.4 menus + costume assets)
    - [ ] 3.3 Retention v1
    - [ ] 3.4 Menus & FTUE

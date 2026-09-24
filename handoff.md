@@ -1,6 +1,6 @@
 # Handoff — "Bark & Chomp"
 
-Last updated: 2026-09-24 (session 11 — Phase 3.2 revive flow and Phase 3.1a treat wallet + treat revive both built and headless-verified; neither confirmed on-device yet. 3.1a reviewed (opus final review, one Important fix), merged to main and pushed)
+Last updated: 2026-09-24 (session 12 — Phase 3.4 split into 3.4a menus / 3.4b FTUE; 3.4a spec and implementation plan written and committed, not yet built. Revive + wallet still not confirmed on-device)
 
 Purpose: read this first at the start of a new session to pick up exactly where things left off. It is a living doc — update it at the end of each session.
 
@@ -341,6 +341,17 @@ Verification: new `scripts/tests/test_revive.gd` (unit; written red first — fa
   - The headless smoke run uses the real `user://save.json`. Today it never reaches run-over, so it never writes.
 - **Not yet confirmed on-device.**
 
+## 2j. Phase 3.4 planning — split into 3.4a / 3.4b (session 12, 2026-09-24)
+
+**Divergence from `bark_and_chomp_project_plan.md` §3.4**: the plan bundles title, shop, settings, pause and a first-run tutorial. Split, by user decision:
+- **3.4a — menus**: title screen (new main scene), pause menu (II button + auto-pause on focus loss + Android Back), Settings overlay (Sound + Music toggles, version), run-over Retry/Home. Spec: `docs/superpowers/specs/2026-09-24-menus-design.md`; plan: `docs/superpowers/plans/2026-09-24-menus.md` (6 tasks). **Planned, not built.**
+- **3.4b — FTUE** (teach hop, bark, deflect; replaces the Round-4 one-time bark hint). Next after 3.4a.
+- **Shop screen moves to 3.1b** — nothing to sell until costumes exist.
+
+3.4a decisions: save format **v2** `{"version":2,"wallet":N,"settings":{"sound":b,"music":b}}` with v1 migration (resolves the 3.1a "version mismatch resets wallet" minor); new `default_bus_layout.tres` (Master/SFX/Music), `Save` applies bus mutes; the pause menu's single rule is "`open()` is a no-op if the tree is already paused" (covers revive prompt, run-over, bark hint); `quit_on_go_back=false`; dev Restart button becomes the pause button; `main.gd` gains `restart_run()` / `go_home()`, both banking via the existing exactly-once guard.
+- **Known limitation (accepted):** pausing mid-hold can leave `input_controller.gd` in TIMING/CHARGING, so the first touch after Resume may resolve as that stale hold.
+- **Verified spikes:** headless loads `res://default_bus_layout.tres`; `change_scene_to_file` works in `-s` tests after 2 frames; `quit_on_go_back` defaults true.
+
 ---
 
 ## 3. What's next (in order)
@@ -351,16 +362,18 @@ Verification: new `scripts/tests/test_revive.gd` (unit; written red first — fa
    - Die with <50 → the button is disabled and shows your balance.
    - Run-over shows `+N` and the wallet total.
    - Close and reopen the app → the wallet persisted.
-2. **Decide on the deferred 3.1a review minors** (§2i). **3.1b costume shop** comes after menus (3.4) and costume assets.
-3. **Phase 2 art/sound asset sourcing** — tracked in `docs/asset_list.md`; deferred to the user's own time.
-4. Phase 3.3 retention v1, 3.4 menus & FTUE.
-5. Phase 3 checklist:
+2. **Execute the 3.4a menus plan** (`docs/superpowers/plans/2026-09-24-menus.md`, §2j) — execution method still to be chosen. Then 3.4b FTUE.
+3. **Decide on the deferred 3.1a review minors** (§2i; the version-mismatch one is resolved by 3.4a). **3.1b costume shop + shop screen** come after 3.4a and costume assets.
+4. **Phase 2 art/sound asset sourcing** — tracked in `docs/asset_list.md`; deferred to the user's own time.
+5. Phase 3.3 retention v1.
+6. Phase 3 checklist:
    - [x] 3.2 Revive flow — built, headless-verified (§2h). **Not yet confirmed on-device.** Treat-cost option deferred to 3.1.
    - [x] 3.1a Treat wallet + treat revive — built, headless-verified (§2i). **Not yet confirmed on-device.**
    - [ ] 3.1b Costume shop — deferred (needs 3.4 menus + costume assets)
    - [ ] 3.3 Retention v1
-   - [ ] 3.4 Menus & FTUE
-6. Phase 2 sub-project checklist, all code-only groundwork now done:
+   - [ ] 3.4a Menus (title, pause, settings) — spec + plan written (§2j)
+   - [ ] 3.4b FTUE
+7. Phase 2 sub-project checklist, all code-only groundwork now done:
    - [x] #1 Difficulty ramp + minimal death state — implemented, headless-verified, committed/pushed (`2126464`). Confirmed on-device.
    - [x] #2 Animation scaffolding — confirmed on-device.
    - [x] #3 Audio scaffolding — headless-verified; nothing audible to confirm by design (silent scaffolding).
